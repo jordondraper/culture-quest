@@ -232,7 +232,83 @@ A closed, ordered list shared by all countries. The CSV stores the slug; the UI 
 
 ## 4. Flows
 
-*To do: startup sequence and failure handling.*
+### 4.1 Startup sequence
+
+```mermaid
+sequenceDiagram
+    participant M as main.py
+    participant UI as Flet UI
+    participant A as api.py
+    participant L as loaders.py
+    participant P as processing.py
+    participant S as AppState
+
+    M->>UI: Apply theme, show loading view
+    M->>A: fetch_country_data()
+    A-->>M: result (records, source, fetched_at, error)
+    M->>L: load_curated_content(phrase_path, culture_path)
+    L-->>M: phrases, culture (raises if invalid)
+    M->>P: normalize_countries(records)
+    P-->>M: countries keyed by code
+    M->>S: Create AppState with all loaded data
+    M->>UI: Render Explore view, or an error view if source is "none"
+```
+
+**Rules**
+
+- **The UI starts first.** The loading view appears before any network call, so the window is never blank during the three API requests.
+- **Curated content is loaded even when country data fails,** so the app can report every problem at once.
+
+### 4.2 Inside `fetch_country_data()`
+
+```mermaid
+flowchart TD
+    start["fetch_country_data()"] --> key{"API key in .env?"}
+    key -->|"yes"| call["Request all pages: limit=100, with timeout"]
+    key -->|"no: error no_api_key"| readcache["Read cache file"]
+    call --> ok{"All pages succeeded?"}
+    ok -->|"yes"| write["Write cache: raw records + fetched_at"]
+    write --> live["Return source: live"]
+    ok -->|"no: set error code"| readcache
+    readcache --> valid{"File exists and is valid JSON?"}
+    valid -->|"no"| delbad["Delete file if corrupted"]
+    delbad --> nodata["Return source: none, with error code"]
+    valid -->|"yes"| fresh{"fetched_at within 3 days?"}
+    fresh -->|"yes"| cached["Return source: cache, with error code"]
+    fresh -->|"no"| delold["Delete expired cache"]
+    delold --> nodata
+```
+
+**Rules**
+
+- **All pages or nothing.** If any page fails, the whole live fetch is treated as failed. A partial country list would silently hide countries from search.
+- **Every request has a timeout** (about 10 seconds), so a hung connection can't freeze the loading screen indefinitely.
+- **No automatic retries in v1.0.** Three requests sit well under the 20-per-10-seconds rate limit, and the user has a Retry button.
+- **A failed cache write doesn't fail the fetch.** The live data is still returned.
+
+### 4.3 Curated content failures
+
+The CSVs are part of the project, not external input, so a missing file or invalid row is a development error.
+
+- `load_curated_content()` **raises** `ValueError` naming the file, row number, and problem (for example, `phrases.csv row 14: unknown category "food"`).
+- `main.py` catches it, prints the full message to the terminal, and runs in **partial mode**: country search and profiles work, while phrase and culture sections show "Curated content is unavailable."
+
+This keeps the error loud during development while still giving users a working app.
+
+### 4.4 Retry
+
+The error view's Retry button calls a reload method on `AppState`, which reruns steps 2–8 of the startup sequence and re-renders the current view. The UI still never calls the data-access layer directly.
+
+### 4.5 User interaction flows
+
+| User action | Function called | Result |
+|---|---|---|
+| Types in search or changes region | `search_countries(countries, query, region)` | Results list re-renders |
+| Opens a country | `build_country_profile(code, countries, phrases, culture)` | Profile view |
+| Selects a phrase category | `filter_phrases(phrases, category)` | Phrase list re-renders |
+| Selects 2–5 countries to compare | `build_population_series(...)`, `build_language_matrix(...)` | Bar chart and language matrix |
+
+All functions in this table are pure and run against data already held in `AppState`, so interactions need no network access.
 
 ## 5. Screens and navigation
 
