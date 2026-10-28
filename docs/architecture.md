@@ -389,4 +389,55 @@ Low-fidelity sketches at phone and desktop widths are in `docs/sketches/`. Detai
 
 ## 6. Testing strategy
 
-*To do.*
+### 6.1 Scope
+
+| Part | Method | Notes |
+|---|---|---|
+| `src/processing.py` | pytest | Pure functions; highest value per test |
+| `src/state.py` | pytest with a fake loader | Uses the injected loader (Section 2) |
+| `src/loaders.py` | pytest with fixture CSVs | Valid file plus one file per validation rule |
+| `src/api.py` | pytest with faked network and `tmp_path` cache | Covers every branch in Section 4.2 |
+| `src/ui/` | Manual checklist (6.5) | Not unit-tested |
+
+**Definition of "enough":** every row in every contract table (Sections 3.2, 3.3, 3.4, and the AppState method table) has at least one test.
+
+### 6.2 Network and file isolation
+
+- Tests never call the live API. `monkeypatch` replaces `requests.get` with fakes that return pages, error statuses, or timeouts.
+- Tests never touch `data/cache/`. `fetch_country_data(cache_path=...)` accepts an optional path; tests pass a file inside `tmp_path`.
+- Cache age is tested by writing `fetched_at` values relative to the current time (for example, 1 day and 5 days old).
+
+### 6.3 Fixtures
+
+- **Raw API records:** hand-written records for Japan, South Africa (multiple capitals), Switzerland (multiple languages), and Antarctica (missing fields), structured like v5 responses. No real API responses are committed, in line with the REST Countries terms.
+- **Normalized countries:** shared fixtures in `tests/conftest.py`.
+- **CSVs:** `tests/fixtures/` holds one valid phrases file, one valid culture file, and one invalid file per validation rule.
+
+### 6.4 Key cases
+
+| Function | Cases |
+|---|---|
+| `normalize_countries()` | Single capital; multiple capitals; multiple languages; missing fields become `None` or empty lists; codes uppercased |
+| `search_countries()` | Partial match; case-insensitive; region filter; blank query returns all; alphabetical order; no matches returns empty list |
+| `build_country_profile()` | Curated country; uncurated country returns empty lists; unknown code raises `ValueError`; phrases sorted by category order |
+| `filter_phrases()` | Each category; `None` returns all |
+| `build_population_series()` | 2 and 5 countries; missing population handled |
+| `build_language_matrix()` | Shared languages; no shared languages; country with no languages |
+| `load_curated_content()` | Valid files; unknown category; invalid country code; missing column; error message names file and row |
+| `fetch_country_data()` | Every path in Section 4.2: live success, each error code, fresh cache, expired cache deleted, corrupted cache deleted, no cache, no API key |
+| `AppState` | Compare limit of 5; duplicates rejected; `can_compare()` at 1, 2, and 5; `reload()` replaces all data |
+
+### 6.5 Manual UI checklist
+
+Used in Phase 8. For each screen, at 380px, 767px, 768px, and 1280px:
+
+- Every state in Section 5.4 can be triggered and displays correctly.
+- Navigation switches between bar and rail at 768px.
+- Back navigation returns from a profile to its origin screen.
+- Attribution appears on About and in the profile's facts section.
+
+### 6.6 Workflow
+
+- Tests are written alongside each function.
+- `ruff check .` and `pytest` run before every commit.
+- Optional: a GitHub Actions workflow runs both on every push.
