@@ -310,9 +310,24 @@ The error view's Retry button calls a reload method on `AppState`, which reruns 
 
 All functions in this table are pure and run against data already held in `AppState`, so interactions need no network access.
 
-## 5. Screens and navigation
+### AppState
 
-*To do: screen list, navigation, and view states.*
+A dataclass in `src/state.py`. It holds loaded data and the selections that must persist across views, and it enforces the rules that protect them. One instance is created in `main.py` and passed to each view; there are no globals.
+
+**Loaded data:** `countries`, `phrases`, `culture`, `source`, `fetched_at`, `fetch_error`, `content_error` (set when CSV validation fails and the app runs in partial mode).
+
+**Persistent selections:** `search_query`, `region_filter`, `compare_codes`. Selections used by only one view, such as the phrase category, stay local to that view.
+
+| Method | Returns | Rule |
+|---|---|---|
+| `reload()` | `None` | Reruns the loading pipeline and replaces all loaded data at once |
+| `add_to_compare(code)` | `bool` | Max 5, no duplicates; `False` when the limit is reached |
+| `remove_from_compare(code)` | `None` | No-op if the code is not selected |
+| `can_compare()` | `bool` | True when 2–5 countries are selected |
+
+**Dependency injection.** `main.py` passes its loading-pipeline function to `AppState` at creation. `reload()` calls it without knowing its contents, so `state.py` imports only the standard library, and tests can supply a fake loader.
+
+**Refreshing views.** The view that calls a state method re-renders its own controls. A subscription mechanism can be added later if needed.
 
 ## 6. Testing strategy
 
