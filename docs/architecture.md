@@ -329,6 +329,64 @@ A dataclass in `src/state.py`. It holds loaded data and the selections that must
 
 **Refreshing views.** The view that calls a state method re-renders its own controls. A subscription mechanism can be added later if needed.
 
+
+## 5. Screens and navigation
+
+### 5.1 Screens and routes
+
+| Screen | Route | Purpose | Key stories |
+|---|---|---|---|
+| Explore | `/explore` | Search and region filter; alphabetical results | US-01 |
+| Country profile | `/country/{code}` | Facts, phrases, cultural notes, add to compare | US-02 to US-05, US-09 (tentative) |
+| Compare | `/compare` | Picker, population chart, language matrix | US-06, US-07 |
+| About | `/about` | Attribution, licensing, app description | TR-05, REST Countries terms |
+
+```mermaid
+flowchart LR
+    explore["Explore"] -->|"select country"| profile["Country profile"]
+    profile -->|"back"| explore
+    profile -->|"add to compare"| compare["Compare"]
+    compare -->|"open country"| profile
+    explore --- navbar(("Navigation bar or rail"))
+    compare --- navbar
+    about["About"] --- navbar
+```
+
+### 5.2 Navigation
+
+- **Top-level destinations:** Explore, Compare, About. The profile is a detail screen with a back arrow, not a destination.
+- **Below 768px:** bottom `NavigationBar`. **768px and above:** side `NavigationRail`. Switched in `page.on_resized`.
+- **Route-based navigation** provides back behavior and lets a profile open from Explore or Compare.
+- **Test widths:** 380px, 767px, 768px, 1280px.
+
+### 5.3 Layout decisions
+
+- **Profile:** one scrolling page with section headers, not tabs. On desktop, `ResponsiveRow` reflows it into two columns (facts left; phrases and culture right).
+- **Compare selection:** a search picker on the Compare screen (reusing `search_countries()`) and an "Add to compare" button on each profile. Both use `AppState` methods, so the 2–5 rule is enforced in one place.
+- **US-09 (tentative):** a compact quick-reference section on the profile showing Emergencies and Basics phrases in large text. To be confirmed against US-09 acceptance criteria.
+- **Attribution:** full credits on About, plus a "Country data: REST Countries" link in the profile's facts section.
+
+### 5.4 View states
+
+All data is loaded once at startup and held in `AppState`, so individual screens never load. Loading is a single app-level state shown at startup and during Retry.
+
+| Screen | Empty | Error | Partial / missing |
+|---|---|---|---|
+| App-wide | — | `source: "none"`: full-screen error (message from error code) with Retry | `source: "cache"`: "Showing saved data from {date}" banner on every screen |
+| Explore | No matches: message plus Clear filters. A blank search lists all countries. | — | — |
+| Profile | No curated content: lists the curated countries (derived from data) | — | Missing fields show "Unavailable." Partial mode: "Curated content is unavailable." |
+| Compare | Fewer than 2 selected: instruction to choose 2–5 | Sixth country: "You can compare up to 5 countries" | Missing population: bar omitted, labeled "Population unavailable." No languages: "No language data." |
+| About | — | — | — |
+
+The phrase category filter has no empty state; Section 3.4 guarantees every curated country has at least one phrase per category.
+
+### 5.5 Sketches
+
+Low-fidelity sketches at phone and desktop widths are in `docs/sketches/`. Detailed wireframes are deferred to Phase 5.
+
+
+
+
 ## 6. Testing strategy
 
 *To do.*
