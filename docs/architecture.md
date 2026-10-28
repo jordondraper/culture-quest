@@ -85,6 +85,8 @@ flowchart TB
 
 Arrows here mean **"calls or imports."** This is a different convention from Section 1, where arrows show the direction data flows.
 
+| `src/constants.py` | Shared | Closed lists: phrase categories, fetch sources, error codes | Nothing |
+
 ### Modules and responsibilities
 
 | Module | Layer | Responsibility | May import |
@@ -209,7 +211,24 @@ A pure function: it joins already-loaded data by country code and performs no fi
 
 ### 3.4 Phrase categories
 
-*To do: closed list of 5–7 categories (Step 3c).*
+A closed, ordered list shared by all countries. The CSV stores the slug; the UI maps each slug to a display label.
+
+| Order | Slug | Display label | Covers |
+|---|---|---|---|
+| 1 | `greetings` | Greetings | Hello, goodbye, introductions |
+| 2 | `basics` | Basics | Please, thank you, sorry, language help |
+| 3 | `dining` | Dining | Ordering, paying, dietary needs |
+| 4 | `getting_around` | Getting around | Directions, transit, taxis |
+| 5 | `shopping` | Shopping | Prices, payment |
+| 6 | `emergencies` | Emergencies | Help, police, medical |
+
+**Rules**
+
+- `load_curated_content()` rejects any row whose category is not in this list.
+- Every curated country has at least one phrase in each category, so no filter shows an empty result.
+- `build_country_profile()` sorts phrases by this order, then by CSV row order.
+- The ordered list lives in `src/constants.py`, importable by every layer. Display labels live in `src/ui/messages.py`.
+- Numbers and time expressions are out of scope for v1.0.
 
 ## 4. Flows
 
