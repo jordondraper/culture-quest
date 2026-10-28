@@ -1,6 +1,6 @@
 # CultureQuest — Architecture
 
-*Living document. Started in Phase 1 (Architecture and design), October 2026.*
+*Phase 1 completed October 2026. Living document; update as the design changes.*
 
 ---
 
@@ -32,16 +32,17 @@ Solid arrows are runtime data flows. Dashed arrows are configuration or manual, 
 **Cache format.** One JSON file, `data/cache/countries.json`:
 
 ```json
-{"fetched_at": "2026-10-27T19:42:00Z", "source": "restcountries-v5", "records": []}
+{"fetched_at": "2026-10-27T19:42:00Z", "provider": "restcountries-v5", "records": []}
 ```
 
 - `fetched_at` is stored inside the file in UTC, rather than relying on the file's modified time, so the 3-day age check is explicit and testable.
+- `provider` names the data provider. It is deliberately not called `source`, which in Section 3.2 means where a result came from (`live`, `cache`, or `none`).
 - `records` holds **raw** API records. Live and cached data both pass through `normalize_countries()`, so there is a single transformation path.
 - Per the REST Countries terms, cached data older than 3 days is not used, and the cache folder is never committed or submitted.
 
 **Configuration.** The API key is read from `.env` at startup. A missing or invalid key is the most likely failure on another machine, so the app reports it with a clear message instead of crashing (see Section 4, Flows).
 
-**Curated content.** Wikivoyage phrasebooks, UNESCO Intangible Cultural Heritage lists, and official tourism boards are researched manually and recorded in the CSVs with a source URL and review date. The app never contacts these sites at runtime. Their attribution, along with REST Countries attribution, appears on the in-app Credits screen.
+**Curated content.** Wikivoyage phrasebooks, UNESCO Intangible Cultural Heritage lists, and official tourism boards are researched manually and recorded in the CSVs with a source URL and review date. The app never contacts these sites at runtime. Their attribution, along with REST Countries attribution, appears on the in-app About screen.
 
 **Data source alternative (pending ADR-0001).** If the `mledoze/countries` dataset plus the World Bank API is approved, only the REST Countries box changes: it splits into a committed JSON file and a keyless API, and the `.env` input and 3-day cache rule no longer apply. Nothing inside the app boundary changes, which confirms the data-access layer is isolated correctly.
 
@@ -56,10 +57,10 @@ This view opens the app box from Section 1 and shows the modules inside it.
 ```mermaid
 flowchart TB
     main["main.py<br/>startup and wiring"]
-    state["AppState<br/>src/state.py (provisional)"]
+    state["AppState<br/>src/state.py"]
 
     subgraph presentation["Presentation layer: src/ui/"]
-        views["Views<br/>Explore, Profile, Compare, Credits"]
+        views["Views<br/>Explore, Profile, Compare, About"]
         uiparts["components.py, theme.py, messages.py"]
     end
 
@@ -68,6 +69,8 @@ flowchart TB
         search["search_countries()"]
         profile["build_country_profile()"]
         filterp["filter_phrases()"]
+        popseries["build_population_series()"]
+        langmatrix["build_language_matrix()"]
     end
 
     subgraph dataaccess["Data access"]
@@ -83,20 +86,19 @@ flowchart TB
     presentation --> state
 ```
 
-Arrows here mean **"calls or imports."** This is a different convention from Section 1, where arrows show the direction data flows.
-
-| `src/constants.py` | Shared | Closed lists: phrase categories, fetch sources, error codes | Nothing |
+Arrows here mean **"calls or imports."** This is a different convention from Section 1, where arrows show the direction data flows. `src/constants.py` is omitted from the diagram because every module may import it.
 
 ### Modules and responsibilities
 
 | Module | Layer | Responsibility | May import |
 |---|---|---|---|
 | `main.py` | Composition | Loads data at startup, normalizes it, creates `AppState`, launches the Flet app | Everything |
-| `src/api.py` | Data access | `fetch_country_data()`: API calls, pagination, cache read/write, expiry | Standard library, `requests`, `python-dotenv` |
-| `src/loaders.py` | Data access | `load_curated_content()`: reads and validates both CSVs | Standard library |
-| `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()` | Standard library only |
-| `src/state.py` | Shared state | `AppState`: holds loaded data and current selections | Standard library only |
-| `src/ui/` | Presentation | Views, reusable components, theme, and the error-code-to-message lookup | `flet`, `flet-charts`, `processing`, `state` |
+| `src/constants.py` | Shared | Closed lists and fixed values: phrase categories, fetch sources, error codes, file paths | Nothing |
+| `src/api.py` | Data access | `fetch_country_data()`: API calls, pagination, cache read/write, expiry | Standard library, `requests`, `python-dotenv`, `constants` |
+| `src/loaders.py` | Data access | `load_curated_content()`: reads and validates both CSVs | Standard library, `constants` |
+| `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()`, `build_population_series()`, `build_language_matrix()` | Standard library, `constants` |
+| `src/state.py` | Shared state | `AppState`: holds loaded data and current selections | Standard library, `constants` |
+| `src/ui/` | Presentation | Views, reusable components, theme, and the error-code-to-message lookup | `flet`, `flet-charts`, `processing`, `state`, `constants` |
 
 ### Dependency rules
 
@@ -105,20 +107,41 @@ Arrows here mean **"calls or imports."** This is a different convention from Sec
 3. **The UI never calls the data-access layer directly.** It never imports `requests` or `api.py`. Startup loading happens in `main.py`; actions such as Retry go through `AppState`, which `main.py` connects to the data layer.
 4. **Raw API field names stay inside `normalize_countries()`.** Every other module works only with the contracts in Section 3.
 
+### AppState
+
+A dataclass in `src/state.py`. It holds loaded data and the selections that must persist across views, and it enforces the rules that protect them. One instance is created in `main.py` and passed to each view; there are no globals.
+
+**Loaded data:** `countries`, `phrases`, `culture`, `source`, `fetched_at`, `fetch_error`, `content_error` (set when CSV validation fails and the app runs in partial mode).
+
+**Persistent selections:** `search_query`, `region_filter`, `compare_codes`. Selections used by only one view, such as the phrase category, stay local to that view.
+
+| Method | Returns | Rule |
+|---|---|---|
+| `reload()` | `None` | Reruns the loading pipeline and replaces all loaded data at once |
+| `add_to_compare(code)` | `bool` | Max 5, no duplicates; `False` when the limit is reached |
+| `remove_from_compare(code)` | `None` | No-op if the code is not selected |
+| `can_compare()` | `bool` | True when 2–5 countries are selected |
+
+**Dependency injection.** `main.py` passes its loading-pipeline function to `AppState` at creation. `reload()` calls it without knowing its contents, so `state.py` stays independent of the network and files, and tests can supply a fake loader.
+
+**Refreshing views.** The view that calls a state method re-renders its own controls. A subscription mechanism can be added later if needed.
+
 ### Startup in brief
 
 `main.py` calls `fetch_country_data()` and `load_curated_content()`, passes the raw records through `normalize_countries()`, stores everything in `AppState`, and starts the UI. The full sequence, including failure paths, is in Section 4.
 
 ### Requirement mapping (TR-01, TR-02)
 
-- TR-01 (at least 3 programmer-defined functions or classes): six functions plus `AppState`.
-- TR-02 (data transformation): `normalize_countries()`, which converts nested API JSON into the country contract.
+- TR-01 (at least 3 programmer-defined functions or classes): eight functions plus the `AppState` class.
+- TR-02 (data transformation): `normalize_countries()`, which converts nested API JSON into the country contract. `build_population_series()` and `build_language_matrix()` also reshape data for the visualizations.
 
-### Provisional items
+### Changes from the original plan
 
-- **`src/loaders.py`** is a change from the original folder plan. CSV loading is data access, so it belongs outside `processing.py` (domain) and outside `api.py` (network). 
-- **`AppState`** fields and methods are defined in Step 5.
-- **`messages.py`** holds the lookup from error codes (Section 3.2) to user-facing text.
+- **`src/loaders.py`** was added. CSV loading is data access, so it belongs outside `processing.py` (domain) and outside `api.py` (network).
+- **`src/constants.py`** and **`src/state.py`** were added to hold shared closed lists and app state.
+
+---
+
 ## 3. Data contracts
 
 Contracts define what each function returns in every situation, so callers never have to guess. All contracts use plain dictionaries. Keys are always present, even when a value is `None`.
@@ -181,6 +204,7 @@ Produced by `normalize_countries()`. All countries are stored in one dictionary 
 - **Codes, not messages.** User-facing wording lives in the presentation layer, which maps each error code to text. This keeps dependencies flowing one way.
 - **Records stay raw.** The caller passes them to `normalize_countries()`, so live and cached data share one transformation path.
 - **Expired caches are deleted,** in line with the REST Countries prohibition on long-term storage.
+- **Replaceable cache path.** `fetch_country_data(cache_path=DEFAULT_CACHE_PATH)` lets tests use a temporary folder; normal calls pass no arguments.
 
 ### 3.3 `build_country_profile()` result
 
@@ -229,6 +253,8 @@ A closed, ordered list shared by all countries. The CSV stores the slug; the UI 
 - `build_country_profile()` sorts phrases by this order, then by CSV row order.
 - The ordered list lives in `src/constants.py`, importable by every layer. Display labels live in `src/ui/messages.py`.
 - Numbers and time expressions are out of scope for v1.0.
+
+---
 
 ## 4. Flows
 
@@ -297,7 +323,7 @@ This keeps the error loud during development while still giving users a working 
 
 ### 4.4 Retry
 
-The error view's Retry button calls a reload method on `AppState`, which reruns steps 2–8 of the startup sequence and re-renders the current view. The UI still never calls the data-access layer directly.
+The error view's Retry button calls `AppState.reload()`, which shows the loading view, reruns the loading pipeline from Section 4.1 (fetch, load CSVs, normalize), and re-renders the current view. The UI still never calls the data-access layer directly.
 
 ### 4.5 User interaction flows
 
@@ -310,25 +336,7 @@ The error view's Retry button calls a reload method on `AppState`, which reruns 
 
 All functions in this table are pure and run against data already held in `AppState`, so interactions need no network access.
 
-### AppState
-
-A dataclass in `src/state.py`. It holds loaded data and the selections that must persist across views, and it enforces the rules that protect them. One instance is created in `main.py` and passed to each view; there are no globals.
-
-**Loaded data:** `countries`, `phrases`, `culture`, `source`, `fetched_at`, `fetch_error`, `content_error` (set when CSV validation fails and the app runs in partial mode).
-
-**Persistent selections:** `search_query`, `region_filter`, `compare_codes`. Selections used by only one view, such as the phrase category, stay local to that view.
-
-| Method | Returns | Rule |
-|---|---|---|
-| `reload()` | `None` | Reruns the loading pipeline and replaces all loaded data at once |
-| `add_to_compare(code)` | `bool` | Max 5, no duplicates; `False` when the limit is reached |
-| `remove_from_compare(code)` | `None` | No-op if the code is not selected |
-| `can_compare()` | `bool` | True when 2–5 countries are selected |
-
-**Dependency injection.** `main.py` passes its loading-pipeline function to `AppState` at creation. `reload()` calls it without knowing its contents, so `state.py` imports only the standard library, and tests can supply a fake loader.
-
-**Refreshing views.** The view that calls a state method re-renders its own controls. A subscription mechanism can be added later if needed.
-
+---
 
 ## 5. Screens and navigation
 
@@ -382,10 +390,9 @@ The phrase category filter has no empty state; Section 3.4 guarantees every cura
 
 ### 5.5 Sketches
 
-Low-fidelity sketches at phone and desktop widths are in `docs/sketches/`. Detailed wireframes are deferred to Phase 5.
+Low-fidelity sketches at phone and desktop widths will be added to `docs/sketches/` before Phase 5. Detailed wireframes are deferred to Phase 5.
 
-
-
+---
 
 ## 6. Testing strategy
 
@@ -442,6 +449,7 @@ Used in Phase 8. For each screen, at 380px, 767px, 768px, and 1280px:
 - `ruff check .` and `pytest` run before every commit.
 - Optional: a GitHub Actions workflow runs both on every push.
 
+---
 
 ## 7. Conventions
 
