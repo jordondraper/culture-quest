@@ -441,3 +441,55 @@ Used in Phase 8. For each screen, at 380px, 767px, 768px, and 1280px:
 - Tests are written alongside each function.
 - `ruff check .` and `pytest` run before every commit.
 - Optional: a GitHub Actions workflow runs both on every push.
+
+
+## 7. Conventions
+
+### 7.1 Code style
+
+- **Naming:** `snake_case` for modules, functions, variables, dictionary keys, and CSV columns; `PascalCase` for classes; `UPPER_SNAKE_CASE` for constants. Category slugs and error codes are lowercase.
+- **Type hints** on every public function's parameters and return value.
+- **Docstrings** on every public function: one-line purpose, then Args, Returns, and Raises where relevant.
+- **Imports:** absolute (`from src.processing import search_countries`), grouped as standard library, third-party, then local. Ruff sorts them.
+- **Formatting and linting:** Ruff, configured in `pyproject.toml`.
+
+```toml
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+```
+
+### 7.2 Design rules
+
+- **Return, don't raise, for expected failures;** raise only for programming errors (Section 3.2).
+- **Catch specific exceptions;** never use a bare `except:`.
+- **Clean data once, at the boundary** where it enters the program (Section 3.3).
+- **No hardcoded data.** File paths and closed lists live in `src/constants.py`; secrets live only in `.env`.
+- **User-facing text lives only in `src/ui/messages.py`.**
+- **Timestamps** are UTC, ISO 8601, ending in `Z`.
+- **Dependencies point one way** (Section 2).
+
+### 7.3 Git workflow
+
+- **One branch per issue,** named after it: `us-01-destination-search`.
+- **Commit messages** use a type prefix: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`.
+- **Before every commit:** `ruff check .`, `pytest`, and `git status` (no `.env`, `.venv`, or `data/cache/`).
+- **Pull requests** include `Closes #N` and confirm which acceptance criteria were verified.
+- **`main` always runs.** Unfinished work stays on its branch.
+- **Versions are pinned** in `requirements.txt`, especially Flet.
+
+### 7.4 Definition of Done
+
+A backlog item is done when its acceptance criteria are verified, its tests pass, Ruff reports no issues, relevant states in Section 5.4 are handled, and it is merged to `main`. The full checklist is Appendix B of the User Stories document.
+
+### 7.5 Decisions
+
+Architecture decisions are recorded in `docs/adr/`:
+
+| ADR | Decision | Status |
+|---|---|---|
+| [0001](adr/0001-data-source-and-caching.md) | Country data source and caching | Proposed |
+| [0002](adr/0002-flet-for-ui.md) | Flet as the UI framework | Accepted |
+| [0003](adr/0003-in-memory-data-no-database.md) | In-memory dictionaries, no database | Accepted |
