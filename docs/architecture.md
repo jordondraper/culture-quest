@@ -51,8 +51,72 @@ Solid arrows are runtime data flows. Dashed arrows are configuration or manual, 
 
 ## 2. Components
 
-*To do: the three layers, the five functions, and `AppState`.*
+This view opens the app box from Section 1 and shows the modules inside it.
 
+```mermaid
+flowchart TB
+    main["main.py<br/>startup and wiring"]
+    state["AppState<br/>src/state.py (provisional)"]
+
+    subgraph presentation["Presentation layer: src/ui/"]
+        views["Views<br/>Explore, Profile, Compare, Credits"]
+        uiparts["components.py, theme.py, messages.py"]
+    end
+
+    subgraph domain["Domain logic: src/processing.py"]
+        normalize["normalize_countries()"]
+        search["search_countries()"]
+        profile["build_country_profile()"]
+        filterp["filter_phrases()"]
+    end
+
+    subgraph dataaccess["Data access"]
+        fetch["fetch_country_data()<br/>src/api.py"]
+        load["load_curated_content()<br/>src/loaders.py"]
+    end
+
+    main --> dataaccess
+    main --> domain
+    main --> state
+    main --> presentation
+    presentation --> domain
+    presentation --> state
+```
+
+Arrows here mean **"calls or imports."** This is a different convention from Section 1, where arrows show the direction data flows.
+
+### Modules and responsibilities
+
+| Module | Layer | Responsibility | May import |
+|---|---|---|---|
+| `main.py` | Composition | Loads data at startup, normalizes it, creates `AppState`, launches the Flet app | Everything |
+| `src/api.py` | Data access | `fetch_country_data()`: API calls, pagination, cache read/write, expiry | Standard library, `requests`, `python-dotenv` |
+| `src/loaders.py` | Data access | `load_curated_content()`: reads and validates both CSVs | Standard library |
+| `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()` | Standard library only |
+| `src/state.py` | Shared state | `AppState`: holds loaded data and current selections | Standard library only |
+| `src/ui/` | Presentation | Views, reusable components, theme, and the error-code-to-message lookup | `flet`, `flet-charts`, `processing`, `state` |
+
+### Dependency rules
+
+1. **Dependencies point one way.** Presentation may call domain logic; domain logic never imports Flet or anything in `src/ui/`.
+2. **The domain layer is pure.** `processing.py` performs no file or network access, which is what makes it straightforward to test with pytest.
+3. **The UI never calls the data-access layer directly.** It never imports `requests` or `api.py`. Startup loading happens in `main.py`; actions such as Retry go through `AppState`, which `main.py` connects to the data layer.
+4. **Raw API field names stay inside `normalize_countries()`.** Every other module works only with the contracts in Section 3.
+
+### Startup in brief
+
+`main.py` calls `fetch_country_data()` and `load_curated_content()`, passes the raw records through `normalize_countries()`, stores everything in `AppState`, and starts the UI. The full sequence, including failure paths, is in Section 4.
+
+### Requirement mapping (TR-01, TR-02)
+
+- TR-01 (at least 3 programmer-defined functions or classes): six functions plus `AppState`.
+- TR-02 (data transformation): `normalize_countries()`, which converts nested API JSON into the country contract.
+
+### Provisional items
+
+- **`src/loaders.py`** is a change from the original folder plan. CSV loading is data access, so it belongs outside `processing.py` (domain) and outside `api.py` (network). 
+- **`AppState`** fields and methods are defined in Step 5.
+- **`messages.py`** holds the lookup from error codes (Section 3.2) to user-facing text.
 ## 3. Data contracts
 
 Contracts define what each function returns in every situation, so callers never have to guess. All contracts use plain dictionaries. Keys are always present, even when a value is `None`.
