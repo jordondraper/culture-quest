@@ -11,6 +11,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_CACHE_PATH = DATA_DIR / "cache" / "countries.json"
+PHRASES_PATH = DATA_DIR / "phrases.csv"
+CULTURE_PATH = DATA_DIR / "culture.csv"
+PHOTOS_PATH = DATA_DIR / "photos.csv"
 
 # --- REST Countries API ---
 API_URL = "https://api.restcountries.com/countries/v5"
@@ -36,3 +39,46 @@ ERROR_BAD_RESPONSE = "bad_response"  # anything else unexpected
 ERROR_CODES = frozenset(
     {ERROR_NO_API_KEY, ERROR_AUTH_FAILED, ERROR_RATE_LIMITED, ERROR_NETWORK, ERROR_BAD_RESPONSE}
 )
+
+# --- Curated content (data/*.csv) ---
+# Phrase categories in display order. A closed list: any other value in phrases.csv is an error.
+PHRASE_CATEGORIES = (
+    "greetings",
+    "basics",
+    "dining",
+    "getting_around",
+    "shopping",
+    "emergencies",
+)
+
+# Columns each CSV must have, and which of them may be left blank.
+PHRASE_COLUMNS = (
+    "country_code",
+    "category",
+    "english",
+    "native",
+    "romanization",
+    "language",
+    "source_url",
+    "reviewed_on",
+)
+PHRASE_OPTIONAL = frozenset({"romanization"})  # only Japanese and Korean use it
+
+CULTURE_COLUMNS = (
+    "country_code",
+    "topic",
+    "summary",
+    "community",
+    "source_url",
+    "reviewed_on",
+)
+CULTURE_OPTIONAL = frozenset({"community"})  # blank means the practice is nationwide
+
+PHOTO_COLUMNS = (
+    "country_code",
+    "image_url",
+    "photographer",
+    "license",
+    "source_url",
+)
+PHOTO_OPTIONAL: frozenset[str] = frozenset()
