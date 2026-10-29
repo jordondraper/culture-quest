@@ -6,7 +6,12 @@ tested with plain Python data.
 
 from typing import Any
 
+from src.constants import PHRASE_CATEGORIES
+
 Country = dict[str, Any]
+
+# Position of each category in display order, e.g. {"greetings": 0, "basics": 1, ...}.
+_CATEGORY_RANK = {category: rank for rank, category in enumerate(PHRASE_CATEGORIES)}
 
 
 # --- Small helpers (private: the leading underscore means "used only in this module") ---
@@ -122,3 +127,135 @@ def normalize_countries(raw_records: list[dict]) -> dict[str, Country]:
         if country is not None:
             countries[country["code"]] = country
     return countries
+
+
+# --- Phase 4: lookups for the screens (search, profile, compare) ---
+
+
+def _country_for(code: str, countries: dict[str, Country]) -> Country:
+    """Return the country for a code, or raise ValueError if the code is unknown."""
+    if code not in countries:
+        raise ValueError(f"Unknown country code: {code}")
+    return countries[code]
+
+
+def search_countries(
+    countries: dict[str, Country], query: str = "", region: str | None = None
+) -> list[Country]:
+    """Filter countries by name and region, sorted alphabetically by name.
+
+    Args:
+        countries: The dict returned by ``normalize_countries()``.
+        query: Text to look for anywhere in the name, ignoring case. Blank matches all.
+        region: An exact region such as "Asia", or None for every region.
+
+    Returns:
+        Matching Country dicts sorted by name (ignoring case); ``[]`` if none match.
+    """
+    needle = query.strip().casefold()
+    matches = [
+        country
+        for country in countries.values()
+        if needle in country["name"].casefold() and (region is None or country["region"] == region)
+    ]
+    # casefold() is a stronger lower(): it makes the sort ignore capital letters.
+    return sorted(matches, key=lambda country: country["name"].casefold())
+
+
+def filter_phrases(phrases: list[dict], category: str | None = None) -> list[dict]:
+    """Return the phrases in one category (CSV order kept), or all of them for None."""
+    if category is None:
+        return list(phrases)  # a new list, so the caller can't change the original
+    return [phrase for phrase in phrases if phrase["category"] == category]
+
+
+def build_country_profile(
+    code: str,
+    countries: dict[str, Country],
+    phrases: list[dict],
+    culture: list[dict],
+    photos: list[dict],
+) -> dict[str, Any]:
+    """Combine one country's facts with its curated phrases, notes and photo.
+
+    Uncurated countries get ``[]``, ``[]`` and ``None`` for the curated parts.
+
+    Returns:
+        {"country": Country, "phrases": [...], "culture": [...], "photo": row or None}.
+        Phrases are ordered by PHRASE_CATEGORIES, then by their order in the CSV.
+
+    Raises:
+        ValueError: The code is not in ``countries``.
+    """
+    country = _country_for(code, countries)
+    own_phrases = [phrase for phrase in phrases if phrase["country_code"] == code]
+    # sorted() is stable, so phrases in the same category keep their CSV order.
+    own_phrases = sorted(own_phrases, key=lambda phrase: _CATEGORY_RANK[phrase["category"]])
+    # next(..., None) gives the first match, or None when there isn't one.
+    photo = next((row for row in photos if row["country_code"] == code), None)
+    return {
+        "country": country,
+        "phrases": own_phrases,
+        "culture": [note for note in culture if note["country_code"] == code],
+        "photo": photo,
+    }
+
+
+def build_population_series(
+    countries: dict[str, Country], codes: list[str]
+) -> list[dict[str, Any]]:
+    """Data for the population bar chart, one entry per code, in ``codes`` order.
+
+    A missing population stays None so the chart can show "Unavailable".
+
+    Raises:
+        ValueError: A code is not in ``countries``.
+    """
+    series = []
+    for code in codes:
+        country = _country_for(code, countries)
+        series.append(
+            {
+                "code": country["code"],
+                "code3": country["code3"],
+                "name": country["name"],
+                "population": country["population"],
+            }
+        )
+    return series
+
+
+def build_language_matrix(countries: dict[str, Country], codes: list[str]) -> dict[str, list]:
+    """Data for the language matrix: which listed languages each country has.
+
+    Columns: languages listed by the most countries first, ties and single-country
+    languages alphabetical. Rows: one per code, in ``codes`` order, with one True/False
+    mark per column.
+
+    Returns:
+        {"languages": ["French", ...], "rows": [{"code", "name", "marks": [bool, ...]}]}
+
+    Raises:
+        ValueError: A code is not in ``countries``.
+    """
+    selected = [_country_for(code, countries) for code in codes]
+    # A set per country, so a language listed twice for one country counts once.
+    language_sets = [{lang["name"] for lang in country["languages"]} for country in selected]
+
+    counts: dict[str, int] = {}
+    for names in language_sets:
+        for name in names:
+            counts[name] = counts.get(name, 0) + 1
+    # Sorting by -count puts the most shared first; every unshared language has
+    # count 1, so they end up last and alphabetical.
+    languages = sorted(counts, key=lambda name: (-counts[name], name.casefold()))
+
+    rows = [
+        {
+            "code": country["code"],
+            "name": country["name"],
+            "marks": [name in names for name in languages],
+        }
+        for country, names in zip(selected, language_sets, strict=True)
+    ]
+    return {"languages": languages, "rows": rows}

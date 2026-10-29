@@ -82,3 +82,7 @@ PHOTO_COLUMNS = (
     "source_url",
 )
 PHOTO_OPTIONAL: frozenset[str] = frozenset()
+
+# --- Compare screen ---
+MIN_COMPARE = 2  # fewer than this shows the empty state instead of the charts
+MAX_COMPARE = 5
