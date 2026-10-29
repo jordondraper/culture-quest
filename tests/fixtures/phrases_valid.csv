@@ -1,0 +1,4 @@
+country_code,category,english,native,romanization,language,source_url,reviewed_on
+JP,greetings,Hello,こんにちは,konnichiwa,Japanese,https://example.test/japanese,2026-10-29
+JP,dining,"The check, please",お会計お願いします,okaikei onegaishimasu,Japanese,https://example.test/japanese,2026-10-29
+FR,greetings,Hello,Bonjour,,French,https://example.test/french,2026-10-29
