@@ -1,0 +1,80 @@
+[
+  {
+    "_note": "Hand-written test record shaped like a REST Countries v5 record (trimmed). Not real API data.",
+    "names": {"common": "Japan", "official": "Japan"},
+    "codes": {"alpha_2": "JP", "alpha_3": "JPN"},
+    "capitals": [
+      {"name": "Tokyo", "attributes": {"primary": true}, "coordinates": {"lat": 35.68, "lng": 139.69}}
+    ],
+    "flag": {"emoji": "🇯🇵", "url_png": "https://flags.example.test/w640/jp.png", "url_svg": ""},
+    "region": "Asia",
+    "subregion": "Eastern Asia",
+    "languages": [{"name": "Japanese", "iso639_3": "jpn", "bcp47": "ja"}],
+    "currencies": [{"code": "JPY", "name": "Japanese yen", "symbol": "¥"}],
+    "population": 123000000
+  },
+  {
+    "_note": "Multiple capitals, listed with the primary one last on purpose.",
+    "names": {"common": "South Africa", "official": "Republic of South Africa"},
+    "codes": {"alpha_2": "ZA", "alpha_3": "ZAF"},
+    "capitals": [
+      {"name": "Bloemfontein", "attributes": {"primary": false}, "coordinates": {"lat": -29.12, "lng": 26.21}},
+      {"name": "Cape Town", "attributes": {"primary": false}, "coordinates": {"lat": -33.92, "lng": 18.42}},
+      {"name": "Pretoria", "attributes": {"primary": true}, "coordinates": {"lat": -25.75, "lng": 28.19}}
+    ],
+    "flag": {"emoji": "🇿🇦", "url_png": "https://flags.example.test/w640/za.png", "url_svg": ""},
+    "region": "Africa",
+    "subregion": "Southern Africa",
+    "languages": [
+      {"name": "English", "iso639_3": "eng", "bcp47": "en"},
+      {"name": "Zulu", "iso639_3": "zul", "bcp47": "zu"}
+    ],
+    "currencies": [{"code": "ZAR", "name": "South African rand", "symbol": "R"}],
+    "population": 60000000
+  },
+  {
+    "_note": "Multiple languages.",
+    "names": {"common": "Switzerland", "official": "Swiss Confederation"},
+    "codes": {"alpha_2": "CH", "alpha_3": "CHE"},
+    "capitals": [
+      {"name": "Bern", "attributes": {"primary": true}, "coordinates": {"lat": 46.95, "lng": 7.45}}
+    ],
+    "flag": {"emoji": "🇨🇭", "url_png": "https://flags.example.test/w640/ch.png", "url_svg": ""},
+    "region": "Europe",
+    "subregion": "Western Europe",
+    "languages": [
+      {"name": "German", "iso639_3": "deu", "bcp47": "de"},
+      {"name": "French", "iso639_3": "fra", "bcp47": "fr"},
+      {"name": "Italian", "iso639_3": "ita", "bcp47": "it"},
+      {"name": "Romansh", "iso639_3": "roh", "bcp47": "rm"}
+    ],
+    "currencies": [{"code": "CHF", "name": "Swiss franc", "symbol": "Fr."}],
+    "population": 8700000
+  },
+  {
+    "_note": "Missing fields: the v5 API sends blank strings and empty lists, not nulls.",
+    "names": {"common": "Antarctica", "official": "Antarctica"},
+    "codes": {"alpha_2": "AQ", "alpha_3": "ATA"},
+    "capitals": [],
+    "flag": {"emoji": "", "url_png": "", "url_svg": ""},
+    "region": "Antarctic",
+    "subregion": "",
+    "languages": [],
+    "currencies": [],
+    "population": null
+  },
+  {
+    "_note": "No alpha-2 code (like Abkhazia in the real data): must be skipped.",
+    "names": {"common": "Testland", "official": "Republic of Testland"},
+    "codes": {"alpha_2": "", "alpha_3": ""},
+    "capitals": [
+      {"name": "Testville", "attributes": {"primary": true}, "coordinates": {"lat": 0, "lng": 0}}
+    ],
+    "flag": {"emoji": "", "url_png": "", "url_svg": ""},
+    "region": "Asia",
+    "subregion": "Western Asia",
+    "languages": [],
+    "currencies": [],
+    "population": 1000
+  }
+]
