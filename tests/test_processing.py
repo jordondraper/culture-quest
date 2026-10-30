@@ -5,6 +5,7 @@ import copy
 import pytest
 
 from src.processing import (
+    bar_fractions,
     build_country_profile,
     build_language_matrix,
     build_population_series,
@@ -399,3 +400,33 @@ def test_group_phrases_follows_category_order():
 
 def test_group_phrases_of_nothing_is_empty():
     assert group_phrases([]) == []
+
+
+# --- bar_fractions() ---
+
+
+def _series(*populations):
+    return [{"code": str(i), "population": p} for i, p in enumerate(populations)]
+
+
+def test_bar_fractions_scale_to_the_largest():
+    assert bar_fractions(_series(50, 200, 100)) == [0.25, 1.0, 0.5]
+
+
+def test_bar_fractions_keep_missing_as_none():
+    assert bar_fractions(_series(100, None)) == [1.0, None]
+
+
+def test_bar_fractions_all_missing():
+    assert bar_fractions(_series(None, None)) == [None, None]
+
+
+def test_bar_fractions_all_zero_does_not_divide_by_zero():
+    assert bar_fractions(_series(0, 0)) == [0.0, 0.0]
+
+
+def test_bar_fractions_of_real_series(countries):
+    series = build_population_series(countries, ["JP", "CH"])
+    fractions = bar_fractions(series)
+    assert fractions[0] == 1.0
+    assert 0 < fractions[1] < 1

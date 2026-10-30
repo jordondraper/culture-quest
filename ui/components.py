@@ -461,7 +461,8 @@ def note_card(note: dict) -> ft.Container:
     return card(controls, spacing=theme.SPACE_S)
 
 
-def uncurated_notice() -> ft.Container:
+def uncurated_notice(curated_names: list[str]) -> ft.Container:
+    """Shown on profiles without phrases; names the countries that do have them."""
     return card(
         [
             ft.Row(
@@ -470,7 +471,7 @@ def uncurated_notice() -> ft.Container:
                     ft.Column(
                         [
                             section_title(msg.UNCURATED_TITLE),
-                            text(msg.UNCURATED_BODY, color=C.ON_SURFACE_VARIANT),
+                            text(msg.uncurated_body(curated_names), color=C.ON_SURFACE_VARIANT),
                         ],
                         spacing=theme.SPACE_XS,
                         expand=True,
@@ -540,18 +541,6 @@ def picker_row(country: dict, added: bool, on_click: Handler | None) -> ft.Conta
         on_click=None if added else on_click,
         ink=not added,
         data=country["code"],
-    )
-
-
-def placeholder_box(message: str, height: int) -> ft.Container:
-    """A reserved, labelled space for a visual that a later phase draws."""
-    return ft.Container(
-        caption(message, text_align=ft.TextAlign.CENTER),
-        height=height,
-        alignment=ft.Alignment.CENTER,
-        bgcolor=C.SURFACE_CONTAINER_LOW,
-        border=ft.Border.all(1, C.OUTLINE_VARIANT),
-        border_radius=theme.RADIUS_S,
     )
 
 

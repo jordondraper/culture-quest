@@ -53,10 +53,6 @@ COUNTRY_DATA = "Country data:"
 REST_COUNTRIES = "REST Countries"
 REST_COUNTRIES_URL = "https://restcountries.com"
 UNCURATED_TITLE = "Phrases and notes aren't available yet"
-UNCURATED_BODY = (
-    "CultureQuest has travel phrases and cultural notes for Japan, Mexico, France, "
-    "South Korea and Brazil."
-)
 
 # --- Status ---
 LOADING = "Loading country data…"
@@ -77,8 +73,9 @@ LANGUAGES_CAPTION = (
     "Languages as listed by REST Countries; not every language community is represented. "
     "Scroll sideways for more."
 )
-CHART_PLACEHOLDER = "The population chart appears here."
-MATRIX_PLACEHOLDER = "The language table appears here."
+COUNTRY_COLUMN = "Country"
+LISTED = "Listed"  # screen-reader text for a check in the language table
+NO_LANGUAGES = "No languages are listed for the selected countries."
 
 # --- About ---
 ABOUT_TITLE = "About"
@@ -274,6 +271,15 @@ def source_name(url: str) -> str:
     return host or url
 
 
+def uncurated_body(curated_names: list[str]) -> str:
+    """Which countries have phrases and notes, built from the data so it is always true."""
+    if not curated_names:
+        return "CultureQuest doesn't have travel phrases or cultural notes for any country yet."
+    names = sorted(curated_names, key=str.casefold)
+    listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return f"CultureQuest has travel phrases and cultural notes for {listed}."
+
+
 def photo_credit(photo: dict) -> str:
     return f"Photo: {photo['photographer']} · {photo['license']} · Wikimedia Commons"
 
@@ -292,6 +298,26 @@ def photo_label(country: dict) -> str:
 
 def remove_label(name: str) -> str:
     return f"Remove {name}"
+
+
+def population_short(population: int | None) -> str:
+    """A bar label in millions: "68M", "8.7M", "0.4M", "1.4B"; "Unavailable" if missing."""
+    if population is None:
+        return UNAVAILABLE
+    if population >= 1_000_000_000:
+        return f"{_one_decimal(population / 1_000_000_000)}B"
+    if population >= 10_000_000:
+        return f"{round(population / 1_000_000)}M"
+    if population >= 100_000:
+        return f"{_one_decimal(population / 1_000_000)}M"
+    return "<0.1M"  # e.g. Vatican City; "0.0M" would read as no people
+
+
+def population_chart_label(series: list[dict]) -> str:
+    """What a screen reader says for the whole chart, e.g.
+    "Population: France about 68 million, Iceland unavailable."."""
+    parts = [f"{entry['name']} {population_text(entry['population']).lower()}" for entry in series]
+    return f"{POPULATION}: {', '.join(parts)}."
 
 
 def compare_empty_text(count: int) -> str:
