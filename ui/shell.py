@@ -39,6 +39,7 @@ class AppShell:
         self.profile: ProfileScreen | None = None
         self.nav: ft.NavigationBar | ft.NavigationRail | None = None
         self.wide = theme.is_wide(page.width)
+        self.fit_width = min(page.width or 0, theme.FIT_LIMIT)
         page.on_resize = self._on_resize
 
     # --- Startup and Retry ---
@@ -73,7 +74,10 @@ class AppShell:
 
     def _on_resize(self, event: ft.Event) -> None:
         wide = theme.is_wide(self.page.width)
-        if wide != self.wide:  # only re-lay out when crossing the breakpoint
+        # Re-lay out when crossing the breakpoint, or on desktop while the window is
+        # narrower than the widest centered column (its width follows the window there).
+        fit = wide and min(self.page.width or 0, theme.FIT_LIMIT) != self.fit_width
+        if wide != self.wide or fit:
             self.wide = wide
             self.render()
 
@@ -82,6 +86,7 @@ class AppShell:
     def render(self) -> None:
         page = self.page
         self.wide = theme.is_wide(page.width)
+        self.fit_width = min(page.width or 0, theme.FIT_LIMIT)
         if self.loading or not self.state.countries:
             view = (
                 status.loading_view()
@@ -118,12 +123,12 @@ class AppShell:
 
     def _screen(self) -> ft.Control:
         if self.profile:
-            return self.profile.view(self.wide)
+            return self.profile.view(self.wide, self.page.width)
         if self.tab == EXPLORE:
-            return self.explore.view(self.wide)
+            return self.explore.view(self.wide, self.page.width)
         if self.tab == COMPARE:
             return self.compare.view(self.wide)
-        return about_view(self.state, self.wide)
+        return about_view(self.state, self.wide, self.page.width)
 
     def _banners(self) -> list[ft.Control]:
         banners = []

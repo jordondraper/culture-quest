@@ -41,11 +41,11 @@ class ProfileScreen:
     def curated(self) -> bool:
         return bool(self.profile["phrases"] or self.profile["culture"])
 
-    def view(self, wide: bool) -> ft.Control:
+    def view(self, wide: bool, page_width: float | None = None) -> ft.Control:
         self.wide = wide
         self.compare_slot.content = self._compare_button()
         self.phrases_slot.content = self._phrases_panel()
-        body = self._desktop_body() if wide else self._phone_body()
+        body = self._desktop_body(page_width) if wide else self._phone_body()
         back_bar = ft.Container(
             ft.IconButton(
                 ft.Icons.ARROW_BACK,
@@ -92,7 +92,7 @@ class ProfileScreen:
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
         )
 
-    def _desktop_body(self) -> ft.Control:
+    def _desktop_body(self, page_width: float | None) -> ft.Control:
         top: list[ft.Control] = []
         if self.profile["photo"]:
             top.append(ui.photo_header(self.profile["photo"], self.country, wide=True))
@@ -128,7 +128,7 @@ class ProfileScreen:
                 spacing=theme.SPACE_XXL,
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             ),
-            width=theme.PROFILE_MAX_WIDTH,
+            width=theme.column_width(page_width, theme.PROFILE_MAX_WIDTH),
             padding=ft.Padding.only(
                 left=theme.MARGIN_DESKTOP,
                 top=theme.SPACE_S,

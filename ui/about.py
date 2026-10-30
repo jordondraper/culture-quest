@@ -8,7 +8,7 @@ from ui import messages as msg
 from ui import theme
 
 
-def about_view(state: AppState, wide: bool) -> ft.Control:
+def about_view(state: AppState, wide: bool, page_width: float | None = None) -> ft.Control:
     margin = theme.MARGIN_DESKTOP if wide else theme.MARGIN_PHONE
     status = ui.facts_card(
         msg.DATA_STATUS,
@@ -50,7 +50,7 @@ def about_view(state: AppState, wide: bool) -> ft.Control:
     )
     content = ft.Container(
         column,
-        width=theme.ABOUT_MAX_WIDTH if wide else None,
+        width=theme.column_width(page_width, theme.ABOUT_MAX_WIDTH) if wide else None,
         padding=ft.Padding.only(left=margin, top=theme.TITLE_TOP_PADDING, right=margin, bottom=32),
     )
     body = ft.Row([content], alignment=ft.MainAxisAlignment.CENTER) if wide else content
