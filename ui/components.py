@@ -79,7 +79,8 @@ def _button_style(
         side=side,
         elevation=0,
         icon_size=theme.ICON_SMALL,
-        text_style=theme.LABEL_L,
+        # Buttons don't inherit the theme font, so name it here.
+        text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, font_family=theme.FONT_FAMILY),
         padding=ft.Padding.only(left=left, right=right),
     )
 
@@ -105,15 +106,27 @@ def outlined_button(label: str, on_click: Handler | None, icon=None) -> ft.Outli
     )
 
 
-def tonal_button(label: str, on_click: Handler | None, icon=None) -> ft.FilledTonalButton:
+def tonal_button(
+    label: str,
+    on_click: Handler | None,
+    icon=None,
+    height: int = theme.BUTTON_HEIGHT,
+    disabled: bool = False,
+) -> ft.FilledTonalButton:
+    """Secondary action ("Add country", "In compare"); greyed out when disabled."""
+    color, bgcolor = (
+        (C.ON_SURFACE_VARIANT, C.SURFACE_CONTAINER_HIGH)
+        if disabled
+        else (C.ON_SECONDARY_CONTAINER, C.SECONDARY_CONTAINER)
+    )
     return ft.FilledTonalButton(
         label,
         icon=icon,
         on_click=on_click,
-        height=theme.BUTTON_HEIGHT,
-        style=_button_style(
-            C.ON_SECONDARY_CONTAINER, C.SECONDARY_CONTAINER, left=16 if icon else 24
-        ),
+        height=height,
+        elevation=0,
+        disabled=disabled,
+        style=_button_style(color, bgcolor, left=16 if icon else 24),
     )
 
 
@@ -353,14 +366,8 @@ def country_tile(country: dict, curated: bool, on_click: Handler) -> ft.Containe
 # --- Profile ---
 
 
-def key_facts(country: dict) -> ft.Container:
-    """Capital, languages, currency and population in one card."""
-    facts = [
-        (msg.CAPITAL, msg.capital_text(country["capitals"])),
-        (msg.languages_label(country["languages"]), msg.languages_text(country["languages"])),
-        (msg.CURRENCY, msg.currency_text(country["currencies"])),
-        (msg.POPULATION, msg.population_text(country["population"])),
-    ]
+def facts_card(title: str, facts: list[tuple[str, str]]) -> ft.Container:
+    """A card of label/value rows with dividers between them (Key facts, Data status)."""
     rows: list[ft.Control] = []
     for index, (label, value) in enumerate(facts):
         if index:
@@ -372,8 +379,21 @@ def key_facts(country: dict) -> ft.Container:
             )
         )
     return card(
-        [section_title(msg.KEY_FACTS), ft.Column(rows, spacing=0, tight=True)],
+        [section_title(title), ft.Column(rows, spacing=0, tight=True)],
         spacing=theme.SPACE_XS,
+    )
+
+
+def key_facts(country: dict) -> ft.Container:
+    """Capital, languages, currency and population in one card."""
+    return facts_card(
+        msg.KEY_FACTS,
+        [
+            (msg.CAPITAL, msg.capital_text(country["capitals"])),
+            (msg.languages_label(country["languages"]), msg.languages_text(country["languages"])),
+            (msg.CURRENCY, msg.currency_text(country["currencies"])),
+            (msg.POPULATION, msg.population_text(country["population"])),
+        ],
     )
 
 
@@ -473,6 +493,87 @@ def data_credit() -> ft.Row:
         ],
         spacing=0,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+
+# --- Compare ---
+
+
+def tray_chip(country: dict, on_open: Handler, on_remove: Handler) -> ft.Chip:
+    """A country in the Compare tray: tap the name to open it, the x to remove it."""
+    return ft.Chip(
+        label=country["name"],
+        label_text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=C.ON_SURFACE),
+        bgcolor=C.TRANSPARENT,
+        border_side=ft.BorderSide(1, C.OUTLINE),
+        shape=ft.StadiumBorder(),
+        padding=ft.Padding.only(left=theme.SPACE_S),
+        visual_density=ft.VisualDensity.COMPACT,
+        delete_icon=ft.Icon(ft.Icons.CLOSE, size=theme.ICON_SMALL),
+        delete_icon_color=C.ON_SURFACE_VARIANT,
+        delete_icon_tooltip=msg.remove_label(country["name"]),
+        on_click=on_open,
+        on_delete=on_remove,
+        data=country["code"],
+    )
+
+
+def picker_row(country: dict, added: bool, on_click: Handler | None) -> ft.Container:
+    """One row in the Add country dialog; countries already in Compare show a check."""
+    trailing = (
+        ft.Icon(ft.Icons.CHECK_CIRCLE, color=C.PRIMARY)
+        if added
+        else ft.Icon(ft.Icons.ADD, color=C.ON_SURFACE_VARIANT)
+    )
+    return ft.Container(
+        ft.Row(
+            [
+                flag(country, theme.FLAG_LIST),
+                text(country["name"], theme.BODY_L, expand=True),
+                trailing,
+            ],
+            spacing=theme.SPACE_L,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        padding=ft.Padding.symmetric(horizontal=theme.SPACE_S, vertical=theme.SPACE_S),
+        border=ft.Border.only(bottom=ft.BorderSide(1, C.OUTLINE_VARIANT)),
+        on_click=None if added else on_click,
+        ink=not added,
+        data=country["code"],
+    )
+
+
+def placeholder_box(message: str, height: int) -> ft.Container:
+    """A reserved, labelled space for a visual that a later phase draws."""
+    return ft.Container(
+        caption(message, text_align=ft.TextAlign.CENTER),
+        height=height,
+        alignment=ft.Alignment.CENTER,
+        bgcolor=C.SURFACE_CONTAINER_LOW,
+        border=ft.Border.all(1, C.OUTLINE_VARIANT),
+        border_radius=theme.RADIUS_S,
+    )
+
+
+# --- About ---
+
+
+def source_row(label: str, detail: str, url: str, first: bool) -> ft.Container:
+    """One credit in the About screen's Sources and licenses list."""
+    return ft.Container(
+        ft.Column(
+            [
+                link_button(label, url),
+                ft.Container(
+                    text(detail, color=C.ON_SURFACE_VARIANT),
+                    padding=ft.Padding.only(left=theme.SPACE_S),
+                ),
+            ],
+            spacing=0,
+            tight=True,
+        ),
+        padding=ft.Padding.symmetric(vertical=theme.SPACE_S),
+        border=None if first else ft.Border.only(top=ft.BorderSide(1, C.OUTLINE_VARIANT)),
     )
 
 

@@ -9,9 +9,10 @@ import flet as ft
 
 from src.constants import SOURCE_CACHE
 from src.state import AppState
-from ui import components as ui
 from ui import messages as msg
 from ui import status, theme
+from ui.about import about_view
+from ui.compare import CompareScreen
 from ui.explore import ExploreScreen
 from ui.profile import ProfileScreen
 
@@ -34,6 +35,7 @@ class AppShell:
         self.offline_dismissed = False
         self.partial_dismissed = False
         self.explore = ExploreScreen(state, on_open=self.open_profile)
+        self.compare = CompareScreen(state, page, on_open=self.open_profile, on_change=self.render)
         self.profile: ProfileScreen | None = None
         self.nav: ft.NavigationBar | ft.NavigationRail | None = None
         self.wide = theme.is_wide(page.width)
@@ -119,18 +121,9 @@ class AppShell:
             return self.profile.view(self.wide)
         if self.tab == EXPLORE:
             return self.explore.view(self.wide)
-        # Compare and About get their real screens in PR B.
-        title, subtitle = (
-            (msg.COMPARE_TITLE, msg.COMPARE_SUBTITLE)
-            if self.tab == COMPARE
-            else (msg.ABOUT_TITLE, msg.ABOUT_SUBTITLE)
-        )
-        margin = theme.MARGIN_DESKTOP if self.wide else theme.MARGIN_PHONE
-        return ft.Container(
-            ui.screen_title(title, subtitle),
-            padding=ft.Padding.only(left=margin, top=theme.TITLE_TOP_PADDING, right=margin),
-            alignment=ft.Alignment.TOP_LEFT,
-        )
+        if self.tab == COMPARE:
+            return self.compare.view(self.wide)
+        return about_view(self.state, self.wide)
 
     def _banners(self) -> list[ft.Control]:
         banners = []

@@ -189,3 +189,36 @@ def test_compare_full_hint_uses_the_limit():
 
 def test_remove_label():
     assert messages.remove_label("Japan") == "Remove Japan"
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (0, "Add 2 to 5 countries to compare population and languages side by side."),
+        (1, "Add one more country to see the comparison."),
+    ],
+)
+def test_compare_empty_text(count, expected):
+    assert messages.compare_empty_text(count) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (0, "You can add 5 more."),
+        (3, "You can add 2 more."),
+        (4, "You can add 1 more."),
+        (5, "Maximum of 5. Remove one in Compare to add another."),
+    ],
+)
+def test_compare_slots_text(count, expected):
+    assert messages.compare_slots_text(count) == expected
+
+
+# --- About ---
+
+
+def test_every_source_has_a_label_detail_and_https_link():
+    for label, detail, url in messages.SOURCES:
+        assert label and detail
+        assert url.startswith("https://")
