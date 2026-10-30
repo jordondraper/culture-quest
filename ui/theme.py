@@ -72,6 +72,7 @@ ICON_SMALL = 18  # inside chips and buttons
 ICON_BADGE = 14
 ICON_EMPTY = 40
 BUTTON_HEIGHT = 40
+CHIP_HEIGHT = 32  # input chips and the tray's Add country button
 SEARCH_HEIGHT = 56
 DROPDOWN_HEIGHT = 40
 DROPDOWN_WIDTH = 168
@@ -94,6 +95,12 @@ PHOTO_HEIGHT_DESKTOP = 320
 BREAKPOINT = 768  # page widths at or above this get the desktop layout
 EXPLORE_MAX_WIDTH = 720
 PROFILE_MAX_WIDTH = 1104
+ABOUT_MAX_WIDTH = 720
+CHART_HEIGHT_PHONE = 200
+CHART_HEIGHT_DESKTOP = 240
+MATRIX_PLACEHOLDER_HEIGHT = 160  # until Phase 6 draws the table
+PICKER_WIDTH = 420
+PICKER_HEIGHT = 480
 
 
 def is_wide(width: float | None) -> bool:

@@ -65,16 +65,57 @@ RETRY = "Retry"
 DISMISS = "Dismiss"
 PARTIAL_BANNER = "Phrases and cultural notes couldn't load. Country facts are still available."
 
-# --- Compare (PR B fills this screen) ---
+# --- Compare ---
 COMPARE_TITLE = "Compare"
 COMPARE_SUBTITLE = "Choose 2 to 5 countries."
 ADD_COUNTRY = "Add country"
+ADD_COUNTRY_TITLE = "Add a country"
+DONE = "Done"
 POPULATION_CHART_CAPTION = "Millions of people"
 LANGUAGES = "Languages"
+LANGUAGES_CAPTION = (
+    "Languages as listed by REST Countries; not every language community is represented. "
+    "Scroll sideways for more."
+)
+CHART_PLACEHOLDER = "The population chart appears here."
+MATRIX_PLACEHOLDER = "The language table appears here."
 
-# --- About (PR B fills this screen) ---
+# --- About ---
 ABOUT_TITLE = "About"
-ABOUT_SUBTITLE = "Prepare for culturally unfamiliar destinations."
+ABOUT_INTRO = (
+    "CultureQuest helps travelers prepare for countries whose language and customs are "
+    "unfamiliar. Find a destination, read its key facts, learn useful phrases and "
+    "etiquette, and compare destinations side by side."
+)
+DATA_STATUS = "Data status"
+SOURCE = "Source"
+FETCHED = "Fetched"
+SOURCES_TITLE = "Sources and licenses"
+# (link text, what it provides, URL) for the About screen's credits list.
+SOURCES = (
+    ("REST Countries", "Country facts and flags", "https://restcountries.com"),
+    ("Wikivoyage phrasebooks", "Phrases · CC BY-SA", "https://en.wikivoyage.org/wiki/Phrasebooks"),
+    (
+        "UNESCO Intangible Cultural Heritage lists",
+        "Cultural notes",
+        "https://ich.unesco.org/en/lists",
+    ),
+    (
+        "Official tourism boards",
+        "Cultural notes, for example JNTO for Japan",
+        "https://www.japan.travel/en/",
+    ),
+    (
+        "Wikimedia Commons",
+        "Country photos · license shown with each photo",
+        "https://commons.wikimedia.org/",
+    ),
+)
+CULTURE_NOTE_TITLE = "A note on culture"
+CULTURE_NOTE = (
+    "Practices vary by region and community. Cultural notes are introductions, not rules."
+)
+BUILT_BY = "Built by Jordon Draper for IS 6495, University of Utah."
 
 # Display names for phrase categories that aren't just the key with spaces.
 _CATEGORY_LABELS = {"getting_around": "Getting around"}
@@ -251,6 +292,21 @@ def photo_label(country: dict) -> str:
 
 def remove_label(name: str) -> str:
     return f"Remove {name}"
+
+
+def compare_empty_text(count: int) -> str:
+    """The instruction shown while fewer than MIN_COMPARE countries are selected."""
+    if count == 0:
+        return "Add 2 to 5 countries to compare population and languages side by side."
+    return "Add one more country to see the comparison."
+
+
+def compare_slots_text(count: int) -> str:
+    """How many more countries fit, shown in the Add country dialog."""
+    left = MAX_COMPARE - count
+    if left <= 0:
+        return COMPARE_FULL_HINT
+    return f"You can add {left} more." if left > 1 else "You can add 1 more."
 
 
 # --- Helpers ---

@@ -61,7 +61,7 @@ flowchart TB
 
     subgraph presentation["Presentation layer: ui/"]
         shell["shell.py<br/>navigation, banners, layout"]
-        views["explore.py, profile.py, status.py<br/>(compare.py, about.py in PR B)"]
+        views["explore.py, profile.py, compare.py,<br/>about.py, status.py"]
         uiparts["components.py, theme.py, messages.py"]
     end
 
@@ -355,8 +355,8 @@ All functions in this table are pure and run against data already held in `AppSt
 |---|---|---|---|
 | Explore | `ui/explore.py` | Search and region filter; alphabetical results | US-01, US-02 |
 | Country profile | `ui/profile.py` | Facts, phrases, cultural notes, add to compare | US-03 to US-05, US-09 (tentative) |
-| Compare | `ui/compare.py` (PR B) | Picker, population chart, language matrix | US-06, US-07 |
-| About | `ui/about.py` (PR B) | Attribution, licensing, app description | TR-05, REST Countries terms |
+| Compare | `ui/compare.py` | Tray, Add country picker (dialog using `search_countries()`), population chart and language matrix (placeholders until Phase 6) | US-06, US-07 |
+| About | `ui/about.py` | App description, data status (source and fetch date), sources and licenses | TR-05, REST Countries terms |
 | Loading, Error, banners | `ui/status.py` | App-wide states | US-08 |
 
 ```mermaid
@@ -398,7 +398,7 @@ All data is loaded once at startup and held in `AppState`, so individual screens
 | App-wide | — | `source: "none"`: full-screen error (message from error code) with Retry | `source: "cache"`: "Showing saved data from {date}" banner on every screen |
 | Explore | No matches: "No countries match “{query}”." plus Clear search. A blank search lists all countries. | — | — |
 | Profile | No curated content: "Phrases and notes aren't available yet" card | — | Missing fields and failed images: "Unavailable," flag placeholder with the country code, landscape placeholder for the photo. Partial mode: app-wide banner |
-| Compare | Fewer than 2 selected: instruction to choose 2–5 | Sixth country: "You can compare up to 5 countries" | Missing population: bar omitted, labeled "Population unavailable." No languages: "No language data." |
+| Compare | Fewer than 2 selected: "Add 2 to 5 countries…" / "Add one more country…"; at 5 the Add country button is disabled | — (a sixth country can't be added) | Missing population: bar omitted, labeled "Population unavailable." No languages: "No language data." |
 | About | — | — | — |
 
 The phrase category filter has no empty state; Section 3.4 guarantees every curated country has at least one phrase per category.

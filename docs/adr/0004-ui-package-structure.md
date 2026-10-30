@@ -17,8 +17,8 @@ Phase 5 builds the Flet presentation layer on top of the pure domain functions a
 
 ## Decision
 
-- UI code lives in a top-level **`ui/`** package: `shell.py` (startup flow, navigation, banners, phone/desktop layout), one file per screen (`explore.py`, `profile.py`, `status.py`, and in PR B `compare.py`, `about.py`), `components.py` (one builder per component), `theme.py` (design values, ADR-0005) and `messages.py`.
-- **`AppShell` handles navigation** without routes. The profile is a detail screen with a back arrow, opened from Explore (and from Compare in PR B).
+- UI code lives in a top-level **`ui/`** package: `shell.py` (startup flow, navigation, banners, phone/desktop layout), one file per screen (`explore.py`, `profile.py`, `compare.py`, `about.py`, `status.py`), `components.py` (one builder per component), `theme.py` (design values, ADR-0005) and `messages.py`.
+- **`AppShell` handles navigation** without routes. The profile is a detail screen with a back arrow, opened from Explore or from a Compare tray chip.
 - **All user-facing text and formatting** (population, dates, error reasons, labels) lives in `ui/messages.py` as **pure functions with unit tests**.
 - The real loader, **`load_app_data()`**, lives in `src/loaders.py` and is injected into `AppState`; startup and Retry both go through `AppState.reload()`.
 
