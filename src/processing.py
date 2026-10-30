@@ -286,3 +286,23 @@ def group_phrases(phrases: list[dict]) -> list[tuple[str, list[dict]]]:
     for phrase in phrases:
         groups[phrase["category"]].append(phrase)
     return [(category, items) for category, items in groups.items() if items]
+
+
+def bar_fractions(series: list[dict[str, Any]]) -> list[float | None]:
+    """Each country's bar height as a share of the largest population (0.0 to 1.0).
+
+    Used to draw the population bar chart: the tallest bar is 1.0 and the others are
+    scaled to it. A missing population stays None so the chart can say "Unavailable".
+
+    Args:
+        series: The list returned by ``build_population_series()``.
+
+    Returns:
+        One value per entry, in the same order; all None if no population is known.
+    """
+    known = [entry["population"] for entry in series if entry["population"] is not None]
+    largest = max(known, default=0)
+    return [
+        None if entry["population"] is None else (entry["population"] / largest if largest else 0.0)
+        for entry in series
+    ]

@@ -222,3 +222,55 @@ def test_every_source_has_a_label_detail_and_https_link():
     for label, detail, url in messages.SOURCES:
         assert label and detail
         assert url.startswith("https://")
+
+
+# --- Phase 6: chart labels and the uncurated notice ---
+
+
+@pytest.mark.parametrize(
+    ("population", "expected"),
+    [
+        (None, "Unavailable"),
+        (1_438_000_000, "1.4B"),
+        (2_000_000_000, "2B"),
+        (211_998_573, "212M"),
+        (68_170_000, "68M"),
+        (10_000_000, "10M"),
+        (8_740_000, "8.7M"),
+        (1_000_000, "1M"),
+        (387_000, "0.4M"),
+        (100_000, "0.1M"),
+        (38_750, "<0.1M"),
+        (0, "<0.1M"),
+    ],
+)
+def test_population_short(population, expected):
+    assert messages.population_short(population) == expected
+
+
+def test_population_chart_label():
+    series = [
+        {"name": "France", "population": 68_170_000},
+        {"name": "Iceland", "population": None},
+    ]
+    expected = "Population: France about 68 million, Iceland unavailable."
+    assert messages.population_chart_label(series) == expected
+
+
+@pytest.mark.parametrize(
+    ("names", "expected"),
+    [
+        (["Japan"], "CultureQuest has travel phrases and cultural notes for Japan."),
+        (
+            ["Japan", "France"],
+            "CultureQuest has travel phrases and cultural notes for France and Japan.",
+        ),
+        (
+            ["Mexico", "Japan", "Brazil"],
+            "CultureQuest has travel phrases and cultural notes for Brazil, Japan and Mexico.",
+        ),
+        ([], "CultureQuest doesn't have travel phrases or cultural notes for any country yet."),
+    ],
+)
+def test_uncurated_body(names, expected):
+    assert messages.uncurated_body(names) == expected

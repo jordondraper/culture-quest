@@ -1,15 +1,15 @@
 """Compare screen: the tray of selected countries, the Add country picker, and the
-spaces for the population chart and language table (US-06, US-07; Phase 6 draws them).
+population bar chart and language matrix (US-06, US-07).
 """
 
 import flet as ft
 
 from src.constants import MAX_COMPARE
-from src.processing import search_countries
+from src.processing import build_language_matrix, build_population_series, search_countries
 from src.state import AppState
+from ui import charts, theme
 from ui import components as ui
 from ui import messages as msg
-from ui import theme
 from ui.components import Handler
 
 C = ft.Colors
@@ -72,23 +72,20 @@ class CompareScreen:
         return ft.Row(chips, wrap=True, spacing=theme.SPACE_S, run_spacing=theme.SPACE_S)
 
     def _population_section(self, wide: bool) -> ft.Control:
-        # Phase 6 swaps the placeholder for the bar chart (build_population_series()).
-        height = theme.CHART_HEIGHT_DESKTOP if wide else theme.CHART_HEIGHT_PHONE
+        series = build_population_series(self.state.countries, self.state.compare_codes)
         header = ft.Row(
             [ui.section_title(msg.POPULATION), ui.caption(msg.POPULATION_CHART_CAPTION)],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.END,
         )
-        return ui.card(
-            [header, ui.placeholder_box(msg.CHART_PLACEHOLDER, height)], spacing=theme.SPACE_S
-        )
+        return ui.card([header, charts.population_chart(series, wide)], spacing=theme.SPACE_L)
 
     def _languages_section(self) -> ft.Control:
-        # Phase 6 swaps the placeholder for the table (build_language_matrix()).
+        matrix = build_language_matrix(self.state.countries, self.state.compare_codes)
         return ft.Column(
             [
                 ui.section_title(msg.LANGUAGES),
-                ui.placeholder_box(msg.MATRIX_PLACEHOLDER, theme.MATRIX_PLACEHOLDER_HEIGHT),
+                charts.language_matrix(matrix),
                 ui.caption(msg.LANGUAGES_CAPTION),
             ],
             spacing=theme.SPACE_S,

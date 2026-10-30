@@ -6,7 +6,7 @@ Phones show Phrases and Cultural notes in tabs; desktop shows two columns (2fr/3
 import flet as ft
 
 from src.constants import MAX_COMPARE
-from src.processing import build_country_profile, group_phrases
+from src.processing import build_country_profile, curated_country_codes, group_phrases
 from src.state import AppState
 from ui import components as ui
 from ui import messages as msg
@@ -82,7 +82,7 @@ class ProfileScreen:
             self.tab_slot.content = self._tab_panel()
             sections.append(ft.Container(self.tab_slot, padding=side))
         else:
-            sections.append(ft.Container(ui.uncurated_notice(), padding=side))
+            sections.append(ft.Container(ui.uncurated_notice(self._curated_names()), padding=side))
         sections.append(ft.Container(ui.data_credit(), padding=side))
         return ft.Column(
             sections,
@@ -110,7 +110,7 @@ class ProfileScreen:
         right: list[ft.Control] = (
             [ui.section_title(msg.PHRASES), self.phrases_slot]
             if self.groups
-            else [ui.uncurated_notice()]
+            else [ui.uncurated_notice(self._curated_names())]
             if not self.curated
             else []
         )
@@ -144,6 +144,13 @@ class ProfileScreen:
         )
 
     # --- Parts ---
+
+    def _curated_names(self) -> list[str]:
+        """Names of the countries that have phrases, for the uncurated notice."""
+        codes = curated_country_codes(self.state.phrases)
+        return [
+            self.state.countries[code]["name"] for code in codes if code in self.state.countries
+        ]
 
     def _header(self) -> ft.Row:
         wide = self.wide
