@@ -103,7 +103,7 @@ Every screen is built from these, and each maps to one standard Flet control.
 | FactCard | `Card` + `Column` | Profile |
 | PhraseCard | `Card` | Profile |
 | CulturalNoteCard | `Card` | Profile |
-| BarChart | `flet_charts.BarChart` | Compare |
+| BarChart | `Container` bars in `ui/charts.py` (ADR-0006) | Compare |
 | LanguageMatrix | `DataTable` | Compare |
 | Banner | `Banner` | Global, top of content |
 | Loading | `ProgressRing` + text | App start |

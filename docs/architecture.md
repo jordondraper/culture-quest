@@ -101,7 +101,7 @@ Arrows here mean **"calls or imports."** This is a different convention from Sec
 | `src/loaders.py` | Data access | `load_curated_content()`: reads and validates the three CSVs. `load_app_data()`: the loader `AppState` calls (fetch → normalize → CSVs; a CSV error becomes `content_error`) | Standard library, `constants`, `api`, `processing` |
 | `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()`, `build_population_series()`, `build_language_matrix()`, plus the screen lookups `list_regions()`, `curated_country_codes()`, `group_phrases()` | Standard library, `constants` |
 | `src/state.py` | Shared state | `AppState`: holds loaded data and current selections | Standard library, `constants` |
-| `ui/` | Presentation | `shell.py` (startup flow, navigation, banners, phone/desktop layout), one file per screen, `components.py` (one builder per component), `theme.py` (every design value), `messages.py` (all user-facing text, pure and unit-tested) | `flet`, `flet-charts`, `processing`, `state`, `constants` |
+| `ui/` | Presentation | `shell.py` (startup flow, navigation, banners, phone/desktop layout), one file per screen, `components.py` (one builder per component), `theme.py` (every design value), `messages.py` (all user-facing text, pure and unit-tested) | `flet`, `processing`, `state`, `constants` |
 
 ### Dependency rules
 
@@ -355,7 +355,7 @@ All functions in this table are pure and run against data already held in `AppSt
 |---|---|---|---|
 | Explore | `ui/explore.py` | Search and region filter; alphabetical results | US-01, US-02 |
 | Country profile | `ui/profile.py` | Facts, phrases, cultural notes, add to compare | US-03 to US-05, US-09 (tentative) |
-| Compare | `ui/compare.py` | Tray, Add country picker (dialog using `search_countries()`), population chart and language matrix (placeholders until Phase 6) | US-06, US-07 |
+| Compare | `ui/compare.py`, `ui/charts.py` | Tray, Add country picker (dialog using `search_countries()`), population bar chart and language overlap matrix (ADR-0006) | US-06, US-07 |
 | About | `ui/about.py` | App description, data status (source and fetch date), sources and licenses | TR-05, REST Countries terms |
 | Loading, Error, banners | `ui/status.py` | App-wide states | US-08 |
 
@@ -397,8 +397,8 @@ All data is loaded once at startup and held in `AppState`, so individual screens
 |---|---|---|---|
 | App-wide | — | `source: "none"`: full-screen error (message from error code) with Retry | `source: "cache"`: "Showing saved data from {date}" banner on every screen |
 | Explore | No matches: "No countries match “{query}”." plus Clear search. A blank search lists all countries. | — | — |
-| Profile | No curated content: "Phrases and notes aren't available yet" card | — | Missing fields and failed images: "Unavailable," flag placeholder with the country code, landscape placeholder for the photo. Partial mode: app-wide banner |
-| Compare | Fewer than 2 selected: "Add 2 to 5 countries…" / "Add one more country…"; at 5 the Add country button is disabled | — (a sixth country can't be added) | Missing population: bar omitted, labeled "Population unavailable." No languages: "No language data." |
+| Profile | No curated content: "Phrases and notes aren't available yet" card naming the countries that do have content (`uncurated_body()`, from the data) | — | Missing fields and failed images: "Unavailable," flag placeholder with the country code, landscape placeholder for the photo. Partial mode: app-wide banner |
+| Compare | Fewer than 2 selected: "Add 2 to 5 countries…" / "Add one more country…"; at 5 the Add country button is disabled | — (a sixth country can't be added) | Missing population: "Unavailable" in place of the bar. No languages for any selected country: "No languages are listed for the selected countries." A country with none gets an empty row. |
 | About | — | — | — |
 
 The phrase category filter has no empty state; Section 3.4 guarantees every curated country has at least one phrase per category.
@@ -427,7 +427,7 @@ The phrase category filter has no empty state; Section 3.4 guarantees every cura
 | `src/state.py` | pytest with a fake loader | Uses the injected loader (Section 2) |
 | `src/loaders.py` | pytest with fixture CSVs | Valid file plus one file per validation rule |
 | `src/api.py` | pytest with faked network and `tmp_path` cache | Covers every branch in Section 4.2 |
-| `ui/messages.py` | pytest | Exact wording and formatting |
+| `ui/messages.py` | pytest | Exact wording and formatting, including chart labels (`population_short()`, `population_chart_label()`) and `uncurated_body()` |
 | `ui/` screens | Screenshots at 390 and 1280px in Flet web mode, then the manual checklist (6.5) | Not unit-tested |
 
 **Definition of "enough":** every row in every contract table (Sections 3.2, 3.3, 3.4, and the AppState method table) has at least one test.
@@ -527,3 +527,4 @@ Architecture decisions are recorded in `docs/adr/`:
 | [0003](adr/0003-in-memory-data-no-database.md) | In-memory dictionaries, no database | Accepted |
 | [0004](adr/0004-ui-package-structure.md) | Top-level `ui/` package: shell, one file per screen, pure messages | Accepted |
 | [0005](adr/0005-hifi-theme-seed-and-bundled-fonts.md) | Seed-based Material 3 theme and bundled Noto fonts | Accepted |
+| [0006](adr/0006-visualizations-from-containers.md) | Population chart and language matrix built from Flet containers | Accepted |
