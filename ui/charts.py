@@ -59,7 +59,7 @@ def population_chart(series: list[dict], wide: bool) -> ft.Control:
 def _bar(entry: dict, fraction: float | None, max_bar: int) -> ft.Container:
     """One column of the chart: value label on top of a teal bar, bottom-aligned."""
     if fraction is None:
-        content: list[ft.Control] = [ui.caption(msg.UNAVAILABLE, text_align=ft.TextAlign.CENTER)]
+        content: list[ft.Control] = [_unavailable_label()]
     else:
         # At least 2 px, so a very small country still shows a sliver of bar.
         bar_height = max(round(fraction * max_bar), 2)
@@ -78,12 +78,38 @@ def _bar(entry: dict, fraction: float | None, max_bar: int) -> ft.Container:
         ft.Column(
             content,
             spacing=theme.SPACE_XS,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            # STRETCH gives the "Unavailable" label the full slot width to center in.
+            horizontal_alignment=(
+                ft.CrossAxisAlignment.STRETCH if fraction is None else ft.CrossAxisAlignment.CENTER
+            ),
             alignment=ft.MainAxisAlignment.END,
             tight=True,
         ),
         expand=True,
         alignment=ft.Alignment.BOTTOM_CENTER,
+    )
+
+
+def _unavailable_label() -> ft.Stack:
+    """ "Unavailable" in place of a bar, on one line.
+
+    With five countries on a phone, a bar slot is narrower than the word, and Flutter
+    would break it mid-word ("Unavaila / ble"). The label may reach a little into the
+    empty gaps beside its slot instead; the neighboring bars are narrower than their
+    slots, so nothing overlaps.
+    """
+    reach = theme.SPACE_M  # how far the label may extend past each side of its slot
+    label = ft.Container(
+        ui.caption(msg.UNAVAILABLE, text_align=ft.TextAlign.CENTER, no_wrap=True),
+        left=-reach,
+        right=-reach,
+        bottom=0,
+        alignment=ft.Alignment.BOTTOM_CENTER,
+    )
+    # The empty Container gives the Stack its height; the label is positioned over it.
+    return ft.Stack(
+        [ft.Container(height=theme.LABEL_M.height * theme.LABEL_M.size), label],
+        clip_behavior=ft.ClipBehavior.NONE,
     )
 
 

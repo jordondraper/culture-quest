@@ -40,7 +40,7 @@ class ExploreScreen:
         }
         self._apply_filters()
 
-    def view(self, wide: bool) -> ft.Control:
+    def view(self, wide: bool, page_width: float | None = None) -> ft.Control:
         """The screen laid out for phone or desktop width."""
         margin = theme.MARGIN_DESKTOP if wide else theme.MARGIN_PHONE
         header = ft.Container(
@@ -66,7 +66,7 @@ class ExploreScreen:
             return column
         # Desktop: the same layout in a centered column at most 720 px wide.
         return ft.Row(
-            [ft.Container(column, width=theme.EXPLORE_MAX_WIDTH)],
+            [ft.Container(column, width=theme.column_width(page_width, theme.EXPLORE_MAX_WIDTH))],
             alignment=ft.MainAxisAlignment.CENTER,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             expand=True,

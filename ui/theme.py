@@ -112,6 +112,21 @@ def is_wide(width: float | None) -> bool:
     return (width or 0) >= BREAKPOINT
 
 
+def column_width(page_width: float | None, max_width: int) -> float:
+    """Width of a centered desktop column: max_width, or less when the window is narrower.
+
+    Beside the navigation rail there are page_width - NAV_RAIL_WIDTH pixels. A fixed
+    max_width wider than that would push the right edge off the screen.
+    """
+    available = (page_width or 0) - NAV_RAIL_WIDTH
+    return max(min(max_width, available), 0)
+
+
+# The widest centered column (Profile). Below this window width, resizing changes the
+# column width, so the shell redraws; above it nothing moves.
+FIT_LIMIT = PROFILE_MAX_WIDTH + NAV_RAIL_WIDTH
+
+
 def apply_theme(page: ft.Page) -> None:
     """Fonts, the seed color scheme and light mode, set once in main.py."""
     page.fonts = FONT_FILES
