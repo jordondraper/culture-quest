@@ -8,7 +8,10 @@ from src.processing import (
     build_country_profile,
     build_language_matrix,
     build_population_series,
+    curated_country_codes,
     filter_phrases,
+    group_phrases,
+    list_regions,
     normalize_countries,
     search_countries,
 )
@@ -356,3 +359,43 @@ def test_compare_builders_do_not_modify_inputs(countries):
     build_population_series(countries, ["JP", "CH"])
     build_language_matrix(countries, ["JP", "CH"])
     assert countries == before
+
+
+# --- Phase 5 lookups: list_regions(), curated_country_codes(), group_phrases() ---
+
+
+def test_list_regions_is_sorted_and_unique(countries):
+    countries["XX"] = {**countries["JP"], "code": "XX"}  # a second Asian country
+    assert list_regions(countries) == ["Africa", "Antarctic", "Asia", "Europe"]
+
+
+def test_list_regions_skips_missing_regions(countries):
+    countries["JP"]["region"] = None
+    assert "Asia" not in list_regions(countries)
+
+
+def test_list_regions_of_nothing_is_empty():
+    assert list_regions({}) == []
+
+
+def test_curated_country_codes(content):
+    assert curated_country_codes(content["phrases"]) == {"JP", "FR"}
+
+
+def test_curated_country_codes_of_nothing_is_empty():
+    assert curated_country_codes([]) == set()
+
+
+def test_group_phrases_follows_category_order():
+    phrases = [
+        {"category": "dining", "english": "Check"},
+        {"category": "greetings", "english": "Hello"},
+        {"category": "dining", "english": "Menu"},
+    ]
+    groups = group_phrases(phrases)
+    assert [category for category, _ in groups] == ["greetings", "dining"]
+    assert [phrase["english"] for phrase in groups[1][1]] == ["Check", "Menu"]
+
+
+def test_group_phrases_of_nothing_is_empty():
+    assert group_phrases([]) == []

@@ -1,15 +1,18 @@
-"""Data access for curated content: phrases.csv, culture.csv and photos.csv.
+"""Data access for the app: curated content (phrases.csv, culture.csv, photos.csv)
+and load_app_data(), which puts country facts and curated content together.
 
-These files are part of the project, so a problem in them is a development error:
-load_curated_content() raises ValueError naming the file, the row and the problem,
-and main.py runs the app in partial mode.
+The curated files are part of the project, so a problem in them is a development
+error: load_curated_content() raises ValueError naming the file, the row and the
+problem, and load_app_data() turns that into partial mode.
 """
 
 import csv
 import re
 from datetime import date
 from pathlib import Path
+from typing import Any
 
+from src.api import fetch_country_data
 from src.constants import (
     CULTURE_COLUMNS,
     CULTURE_OPTIONAL,
@@ -22,6 +25,7 @@ from src.constants import (
     PHRASE_OPTIONAL,
     PHRASES_PATH,
 )
+from src.processing import normalize_countries
 
 Row = dict[str, str]
 
@@ -29,7 +33,39 @@ Row = dict[str, str]
 _COUNTRY_CODE = re.compile(r"[A-Z]{2}")
 
 
-# --- Public function ---
+# --- Public functions ---
+
+
+def load_app_data() -> dict[str, Any]:
+    """Load everything AppState needs: the loader passed to AppState in main.py.
+
+    Steps: fetch_country_data() -> normalize_countries() -> load_curated_content().
+    Never raises for expected problems: a failed fetch shows up as fetch_error (and no
+    countries when there is no cache), and a broken CSV shows up as content_error with
+    empty curated lists, so the app still opens with country facts (partial mode).
+
+    Returns:
+        {"countries", "phrases", "culture", "photos", "source", "fetched_at",
+        "fetch_error", "content_error"}
+    """
+    fetched = fetch_country_data()
+    try:
+        content = load_curated_content()
+        content_error = None
+    except ValueError as error:
+        content = {"phrases": [], "culture": [], "photos": []}
+        content_error = str(error)
+
+    return {
+        "countries": normalize_countries(fetched["records"]),
+        "phrases": content["phrases"],
+        "culture": content["culture"],
+        "photos": content["photos"],
+        "source": fetched["source"],
+        "fetched_at": fetched["fetched_at"],
+        "fetch_error": fetched["error"],
+        "content_error": content_error,
+    }
 
 
 def load_curated_content(

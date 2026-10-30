@@ -259,3 +259,30 @@ def build_language_matrix(countries: dict[str, Country], codes: list[str]) -> di
         for country, names in zip(selected, language_sets, strict=True)
     ]
     return {"languages": languages, "rows": rows}
+
+
+# --- Phase 5: small lookups the screens need ---
+
+
+def list_regions(countries: dict[str, Country]) -> list[str]:
+    """Every region that at least one country has, sorted A to Z (for the Region filter)."""
+    regions = {country["region"] for country in countries.values() if country["region"]}
+    return sorted(regions, key=str.casefold)
+
+
+def curated_country_codes(phrases: list[dict]) -> set[str]:
+    """Codes of the countries that have curated phrases (they get the Phrases badge)."""
+    return {phrase["country_code"] for phrase in phrases}
+
+
+def group_phrases(phrases: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Group phrases by category, in PHRASE_CATEGORIES order, skipping empty categories.
+
+    Returns:
+        A list such as [("greetings", [...]), ("basics", [...])]. Phrases keep their
+        order within each group. The categories in the result are also the filter chips.
+    """
+    groups: dict[str, list[dict]] = {category: [] for category in PHRASE_CATEGORIES}
+    for phrase in phrases:
+        groups[phrase["category"]].append(phrase)
+    return [(category, items) for category, items in groups.items() if items]

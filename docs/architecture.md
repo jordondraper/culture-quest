@@ -1,6 +1,6 @@
 # CultureQuest — Architecture
 
-*Phase 1 completed October 2026. Living document; update as the design changes.*
+*Phase 1 completed October 2026; updated October 29, 2026 for Phase 5 (presentation layer). Living document; update as the design changes.*
 
 ---
 
@@ -13,7 +13,7 @@ flowchart LR
     traveler["Traveler"] <-->|"search, browse, compare"| app["CultureQuest app<br/>Python + Flet"]
     env[/".env<br/>REST_COUNTRIES_API_KEY"/] -.->|"API key, read at startup"| app
     api["REST Countries API v5"] -->|"HTTPS + bearer token<br/>paginated JSON"| app
-    csv[("phrases.csv<br/>culture.csv")] -->|"UTF-8 CSV, read-only"| app
+    csv[("phrases.csv, culture.csv,<br/>photos.csv")] -->|"UTF-8 CSV, read-only"| app
     app <-->|"write after fetch, read on failure<br/>raw records + fetched_at (UTC)"| cache[("data/cache/countries.json<br/>3-day limit, gitignored")]
     sources["Wikivoyage, UNESCO,<br/>official tourism boards"] -.->|"manual curation, design time"| csv
 
@@ -59,8 +59,9 @@ flowchart TB
     main["main.py<br/>startup and wiring"]
     state["AppState<br/>src/state.py"]
 
-    subgraph presentation["Presentation layer: src/ui/"]
-        views["Views<br/>Explore, Profile, Compare, About"]
+    subgraph presentation["Presentation layer: ui/"]
+        shell["shell.py<br/>navigation, banners, layout"]
+        views["explore.py, profile.py, status.py<br/>(compare.py, about.py in PR B)"]
         uiparts["components.py, theme.py, messages.py"]
     end
 
@@ -71,17 +72,19 @@ flowchart TB
         filterp["filter_phrases()"]
         popseries["build_population_series()"]
         langmatrix["build_language_matrix()"]
+        helpers["list_regions(), curated_country_codes(),<br/>group_phrases()"]
     end
 
     subgraph dataaccess["Data access"]
         fetch["fetch_country_data()<br/>src/api.py"]
-        load["load_curated_content()<br/>src/loaders.py"]
+        load["load_app_data()<br/>load_curated_content()<br/>src/loaders.py"]
     end
 
-    main --> dataaccess
-    main --> domain
     main --> state
     main --> presentation
+    state -.->|"injected loader"| load
+    load --> fetch
+    load --> normalize
     presentation --> domain
     presentation --> state
 ```
@@ -92,28 +95,28 @@ Arrows here mean **"calls or imports."** This is a different convention from Sec
 
 | Module | Layer | Responsibility | May import |
 |---|---|---|---|
-| `main.py` | Composition | Loads data at startup, normalizes it, creates `AppState`, launches the Flet app | Everything |
+| `main.py` | Composition | Loads `.env`, applies the theme, creates `AppState(loader=load_app_data)` and `AppShell`, launches the Flet app | Everything |
 | `src/constants.py` | Shared | Closed lists and fixed values: phrase categories, fetch sources, error codes, file paths | Nothing |
 | `src/api.py` | Data access | `fetch_country_data()`: API calls, pagination, cache read/write, expiry | Standard library, `requests`, `python-dotenv`, `constants` |
-| `src/loaders.py` | Data access | `load_curated_content()`: reads and validates both CSVs | Standard library, `constants` |
-| `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()`, `build_population_series()`, `build_language_matrix()` | Standard library, `constants` |
+| `src/loaders.py` | Data access | `load_curated_content()`: reads and validates the three CSVs. `load_app_data()`: the loader `AppState` calls (fetch → normalize → CSVs; a CSV error becomes `content_error`) | Standard library, `constants`, `api`, `processing` |
+| `src/processing.py` | Domain logic | `normalize_countries()`, `search_countries()`, `build_country_profile()`, `filter_phrases()`, `build_population_series()`, `build_language_matrix()`, plus the screen lookups `list_regions()`, `curated_country_codes()`, `group_phrases()` | Standard library, `constants` |
 | `src/state.py` | Shared state | `AppState`: holds loaded data and current selections | Standard library, `constants` |
-| `src/ui/` | Presentation | Views, reusable components, theme, and the error-code-to-message lookup | `flet`, `flet-charts`, `processing`, `state`, `constants` |
+| `ui/` | Presentation | `shell.py` (startup flow, navigation, banners, phone/desktop layout), one file per screen, `components.py` (one builder per component), `theme.py` (every design value), `messages.py` (all user-facing text, pure and unit-tested) | `flet`, `flet-charts`, `processing`, `state`, `constants` |
 
 ### Dependency rules
 
-1. **Dependencies point one way.** Presentation may call domain logic; domain logic never imports Flet or anything in `src/ui/`.
+1. **Dependencies point one way.** Presentation may call domain logic; domain logic never imports Flet or anything in `ui/`. The UI lives in a top-level `ui/` package so `src/` stays UI-free (ADR-0004).
 2. **The domain layer is pure.** `processing.py` performs no file or network access, which is what makes it straightforward to test with pytest.
-3. **The UI never calls the data-access layer directly.** It never imports `requests` or `api.py`. Startup loading happens in `main.py`; actions such as Retry go through `AppState`, which `main.py` connects to the data layer.
+3. **The UI never calls the data-access layer directly.** It never imports `requests`, `api.py` or `loaders.py`. Startup and Retry both call `AppState.reload()`, which runs the loader `main.py` injected (`load_app_data()`).
 4. **Raw API field names stay inside `normalize_countries()`.** Every other module works only with the contracts in Section 3.
 
 ### AppState
 
 A dataclass in `src/state.py`. It holds loaded data and the selections that must persist across views, and it enforces the rules that protect them. One instance is created in `main.py` and passed to each view; there are no globals.
 
-**Loaded data:** `countries`, `phrases`, `culture`, `source`, `fetched_at`, `fetch_error`, `content_error` (set when CSV validation fails and the app runs in partial mode).
+**Loaded data:** `countries`, `phrases`, `culture`, `photos`, `source`, `fetched_at`, `fetch_error`, `content_error` (set when CSV validation fails and the app runs in partial mode).
 
-**Persistent selections:** `search_query`, `region_filter`, `compare_codes`. Selections used by only one view, such as the phrase category, stay local to that view.
+**Persistent selections:** `search_query`, `region_filter`, `compare_codes`. Selections used by only one view, such as the phrase category and the profile tab, stay local to that view (`ProfileScreen`).
 
 | Method | Returns | Rule |
 |---|---|---|
@@ -124,21 +127,22 @@ A dataclass in `src/state.py`. It holds loaded data and the selections that must
 
 **Dependency injection.** `main.py` passes its loading-pipeline function to `AppState` at creation. `reload()` calls it without knowing its contents, so `state.py` stays independent of the network and files, and tests can supply a fake loader.
 
-**Refreshing views.** The view that calls a state method re-renders its own controls. A subscription mechanism can be added later if needed.
+**Refreshing views.** The view that calls a state method re-renders its own controls; it tells the shell through a callback when something outside it changes (Add to compare → the Compare count badge).
 
 ### Startup in brief
 
-`main.py` calls `fetch_country_data()` and `load_curated_content()`, passes the raw records through `normalize_countries()`, stores everything in `AppState`, and starts the UI. The full sequence, including failure paths, is in Section 4.
+`main.py` creates `AppState(loader=load_app_data)` and `AppShell`, and calls `shell.load()`: the Loading view appears, `AppState.reload()` runs the loader, and the shell shows Explore or the Error view. The full sequence, including failure paths, is in Section 4.
 
 ### Requirement mapping (TR-01, TR-02)
 
-- TR-01 (at least 3 programmer-defined functions or classes): eight functions plus the `AppState` class.
+- TR-01 (at least 3 programmer-defined functions or classes): the data and domain functions above, the `AppState`, `AppShell`, `ExploreScreen` and `ProfileScreen` classes, and the formatting functions in `ui/messages.py`.
 - TR-02 (data transformation): `normalize_countries()`, which converts nested API JSON into the country contract. `build_population_series()` and `build_language_matrix()` also reshape data for the visualizations.
 
 ### Changes from the original plan
 
 - **`src/loaders.py`** was added. CSV loading is data access, so it belongs outside `processing.py` (domain) and outside `api.py` (network).
 - **`src/constants.py`** and **`src/state.py`** were added to hold shared closed lists and app state.
+- **Phase 5:** the UI moved from `src/ui/` to a top-level `ui/` package (ADR-0004), and `load_app_data()` became the single loader used at startup and on Retry, instead of `main.py` calling each data function.
 
 ---
 
@@ -162,7 +166,7 @@ Produced by `normalize_countries()`. All countries are stored in one dictionary 
     "languages": [{"code": "jpn", "name": "Japanese"}],
     "currencies": [{"code": "JPY", "name": "Japanese yen", "symbol": "¥"}],
     "population": 125124989,   # int, or None if missing
-    "flag": "🇯🇵",
+    "flag": "https://flagcdn.com/w320/jp.png",  # PNG URL, or None
 }
 ```
 
@@ -215,13 +219,14 @@ A pure function: it joins already-loaded data by country code and performs no fi
     "country": {...},   # the country dictionary from 3.1, unchanged
     "phrases": [...],   # rows from phrases.csv for this country
     "culture": [...],   # rows from culture.csv for this country
+    "photo": {...},     # the photos.csv row for this country, or None
 }
 ```
 
 | Input | Output |
 |---|---|
 | Valid code, curated country | `country` plus non-empty `phrases` and `culture` lists |
-| Valid code, no curated content | `country` plus two empty lists |
+| Valid code, no curated content | `country` plus two empty lists and `photo: None` |
 | Unknown code | Raises `ValueError("Unknown country code: XX")` |
 
 **Design decisions**
@@ -251,7 +256,7 @@ A closed, ordered list shared by all countries. The CSV stores the slug; the UI 
 - `load_curated_content()` rejects any row whose category is not in this list.
 - Every curated country has at least one phrase in each category, so no filter shows an empty result.
 - `build_country_profile()` sorts phrases by this order, then by CSV row order.
-- The ordered list lives in `src/constants.py`, importable by every layer. Display labels live in `src/ui/messages.py`.
+- The ordered list lives in `src/constants.py`, importable by every layer. Display labels live in `ui/messages.py` (`category_label()`).
 - Numbers and time expressions are out of scope for v1.0.
 
 ---
@@ -263,27 +268,31 @@ A closed, ordered list shared by all countries. The CSV stores the slug; the UI 
 ```mermaid
 sequenceDiagram
     participant M as main.py
-    participant UI as Flet UI
-    participant A as api.py
-    participant L as loaders.py
-    participant P as processing.py
+    participant SH as AppShell (ui/shell.py)
     participant S as AppState
+    participant L as load_app_data()
+    participant A as api.py
+    participant P as processing.py
 
-    M->>UI: Apply theme, show loading view
-    M->>A: fetch_country_data()
-    A-->>M: result (records, source, fetched_at, error)
-    M->>L: load_curated_content(phrase_path, culture_path)
-    L-->>M: phrases, culture (raises if invalid)
-    M->>P: normalize_countries(records)
-    P-->>M: countries keyed by code
-    M->>S: Create AppState with all loaded data
-    M->>UI: Render Explore view, or an error view if source is "none"
+    M->>M: load_dotenv(), apply_theme(page)
+    M->>SH: AppShell(page, AppState(loader=load_app_data))
+    M->>SH: shell.load()
+    SH->>SH: Show Loading view
+    SH->>S: reload()
+    S->>L: loader()
+    L->>A: fetch_country_data()
+    A-->>L: records, source, fetched_at, error
+    L->>P: normalize_countries(records)
+    L->>L: load_curated_content() (ValueError → content_error)
+    L-->>S: countries, phrases, culture, photos, source, fetched_at, fetch_error, content_error
+    SH->>SH: No countries → Error view with Retry; otherwise Explore (+ banners)
 ```
 
 **Rules**
 
-- **The UI starts first.** The loading view appears before any network call, so the window is never blank during the three API requests.
+- **The UI starts first.** The Loading view appears before any network call, so the window is never blank during the three API requests.
 - **Curated content is loaded even when country data fails,** so the app can report every problem at once.
+- **Banners:** `source == "cache"` adds the offline banner ("Showing saved data from {date}." with Retry and Dismiss, US-08); `content_error` adds the partial-mode banner. Both sit at the top of the content area, beside the rail on desktop, never over it.
 
 ### 4.2 Inside `fetch_country_data()`
 
@@ -317,21 +326,21 @@ flowchart TD
 The CSVs are part of the project, not external input, so a missing file or invalid row is a development error.
 
 - `load_curated_content()` **raises** `ValueError` naming the file, row number, and problem (for example, `phrases.csv row 14: unknown category "food"`).
-- `main.py` catches it, prints the full message to the terminal, and runs in **partial mode**: country search and profiles work, while phrase and culture sections show "Curated content is unavailable."
+- `load_app_data()` catches it and stores the message in `content_error`, and the app runs in **partial mode**: country search and profiles work, and a banner says "Phrases and cultural notes couldn't load. Country facts are still available." The full message stays in `AppState.content_error` for debugging.
 
 This keeps the error loud during development while still giving users a working app.
 
 ### 4.4 Retry
 
-The error view's Retry button calls `AppState.reload()`, which shows the loading view, reruns the loading pipeline from Section 4.1 (fetch, load CSVs, normalize), and re-renders the current view. The UI still never calls the data-access layer directly.
+The Error view's Retry button and the offline banner's Retry both call `AppShell.load()`: it shows the Loading view, calls `AppState.reload()` (which reruns the loader from Section 4.1), resets dismissed banners and returns to Explore. The UI still never calls the data-access layer directly.
 
 ### 4.5 User interaction flows
 
 | User action | Function called | Result |
 |---|---|---|
-| Types in search or changes region | `search_countries(countries, query, region)` | Results list re-renders |
-| Opens a country | `build_country_profile(code, countries, phrases, culture)` | Profile view |
-| Selects a phrase category | `filter_phrases(phrases, category)` | Phrase list re-renders |
+| Types in search or changes region | `search_countries(countries, query, region)` | Results list re-renders (tiles are built once and reused) |
+| Opens a country | `build_country_profile(code, countries, phrases, culture, photos)` | Profile view |
+| Selects a phrase category | `group_phrases(phrases)`, filtered to the category | Phrase list re-renders (group headings only under All) |
 | Selects 2–5 countries to compare | `build_population_series(...)`, `build_language_matrix(...)` | Bar chart and language matrix |
 
 All functions in this table are pure and run against data already held in `AppState`, so interactions need no network access.
@@ -342,12 +351,13 @@ All functions in this table are pure and run against data already held in `AppSt
 
 ### 5.1 Screens and routes
 
-| Screen | Route | Purpose | Key stories |
+| Screen | File | Purpose | Key stories |
 |---|---|---|---|
-| Explore | `/explore` | Search and region filter; alphabetical results | US-01 |
-| Country profile | `/country/{code}` | Facts, phrases, cultural notes, add to compare | US-02 to US-05, US-09 (tentative) |
-| Compare | `/compare` | Picker, population chart, language matrix | US-06, US-07 |
-| About | `/about` | Attribution, licensing, app description | TR-05, REST Countries terms |
+| Explore | `ui/explore.py` | Search and region filter; alphabetical results | US-01, US-02 |
+| Country profile | `ui/profile.py` | Facts, phrases, cultural notes, add to compare | US-03 to US-05, US-09 (tentative) |
+| Compare | `ui/compare.py` (PR B) | Picker, population chart, language matrix | US-06, US-07 |
+| About | `ui/about.py` (PR B) | Attribution, licensing, app description | TR-05, REST Countries terms |
+| Loading, Error, banners | `ui/status.py` | App-wide states | US-08 |
 
 ```mermaid
 flowchart LR
@@ -363,16 +373,21 @@ flowchart LR
 ### 5.2 Navigation
 
 - **Top-level destinations:** Explore, Compare, About. The profile is a detail screen with a back arrow, not a destination.
-- **Below 768px:** bottom `NavigationBar`. **768px and above:** side `NavigationRail`. Switched in `page.on_resized`.
-- **Route-based navigation** provides back behavior and lets a profile open from Explore or Compare.
+- **Below 768px:** bottom `NavigationBar`. **768px and above:** side `NavigationRail`. `page.on_resize` re-lays out the frame only when the width crosses 768px.
+- **State-based navigation (changed in Phase 5).** `AppShell` keeps the selected destination and the open profile, and rebuilds the frame when they change. The profile's back arrow closes it and returns to the destination underneath. Flet routes were dropped: a desktop app has no URL bar, and one shell object is simpler to follow and test by hand. The Compare destination shows a count badge when countries are selected.
 - **Test widths:** 380px, 767px, 768px, 1280px.
 
 ### 5.3 Layout decisions
 
-- **Profile:** one scrolling page with section headers, not tabs. On desktop, `ResponsiveRow` reflows it into two columns (facts left; phrases and culture right).
-- **Compare selection:** a search picker on the Compare screen (reusing `search_countries()`) and an "Add to compare" button on each profile. Both use `AppState` methods, so the 2–5 rule is enforced in one place.
+The hi-fi design pass ("Passport teal", Phase 4.5) set the layouts below; where it differs from earlier plans, the hi-fi wins.
+
+- **Explore:** title block, pill search field, a row with the result count and a compact Region dropdown, then a full-bleed country list. Curated countries carry a "Phrases" badge. Desktop centers the same layout in a 720px column beside the rail.
+- **Profile, phone:** back arrow, full-bleed photo with credit, flag + name + region, Add to compare, Key facts card, then **tabs** (Phrases · Cultural notes). Phrases have category chips, group headings under "All", and one source line.
+- **Profile, desktop:** content up to 1104px wide: photo banner, header row with Add to compare on the right, then two columns (2fr/3fr): Key facts and Cultural notes on the left, Phrases in a two-column card grid on the right. No tabs.
+- **Uncurated countries:** no photo or tabs; a notice card lists the curated countries.
+- **Compare selection:** a search picker on the Compare screen (reusing `search_countries()`) and an "Add to compare" button on each profile with three states (Add, In compare, Compare is full). Both use `AppState` methods, so the 2–5 rule is enforced in one place.
 - **US-09 (tentative):** a compact quick-reference section on the profile showing Emergencies and Basics phrases in large text. To be confirmed against US-09 acceptance criteria.
-- **Attribution:** full credits on About, plus a "Country data: REST Countries" link in the profile's facts section.
+- **Attribution:** full credits on About, plus "Country data: REST Countries" at the bottom of the profile and a credit line under each photo.
 
 ### 5.4 View states
 
@@ -381,16 +396,24 @@ All data is loaded once at startup and held in `AppState`, so individual screens
 | Screen | Empty | Error | Partial / missing |
 |---|---|---|---|
 | App-wide | — | `source: "none"`: full-screen error (message from error code) with Retry | `source: "cache"`: "Showing saved data from {date}" banner on every screen |
-| Explore | No matches: message plus Clear filters. A blank search lists all countries. | — | — |
-| Profile | No curated content: lists the curated countries (derived from data) | — | Missing fields show "Unavailable." Partial mode: "Curated content is unavailable." |
+| Explore | No matches: "No countries match “{query}”." plus Clear search. A blank search lists all countries. | — | — |
+| Profile | No curated content: "Phrases and notes aren't available yet" card | — | Missing fields and failed images: "Unavailable," flag placeholder with the country code, landscape placeholder for the photo. Partial mode: app-wide banner |
 | Compare | Fewer than 2 selected: instruction to choose 2–5 | Sixth country: "You can compare up to 5 countries" | Missing population: bar omitted, labeled "Population unavailable." No languages: "No language data." |
 | About | — | — | — |
 
 The phrase category filter has no empty state; Section 3.4 guarantees every curated country has at least one phrase per category.
 
-### 5.5 Sketches
+### 5.5 Design references
 
-Low-fidelity sketches at phone and desktop widths will be added to `docs/sketches/` before Phase 5. Detailed wireframes are deferred to Phase 5.
+- Hi-fi canvas ("CultureQuest Hi-fi"): the visual target for Phase 5. Its values are transferred to code in `ui/theme.py` (ADR-0005).
+- Lo-fi wireframes (all 10 artboards) and the design system document: the layout record for screens the hi-fi did not redraw (About, Compare desktop).
+
+### 5.6 Presentation-layer rules
+
+- **`ui/theme.py` is the only place design values live.** Screens use `ft.Colors` role names (`PRIMARY`, `SURFACE_CONTAINER_HIGH`, …) and theme constants, never hex codes; changing `SEED` recolors the app (ADR-0005).
+- **`ui/messages.py` holds every user-facing string** and formatting function (population, dates, error reasons, labels). It is pure and unit-tested.
+- **One builder per component** in `ui/components.py` (card, search field, country tile, flag, phrase card, buttons, banner, …). Builders take plain data and callbacks and never read `AppState`.
+- **Screens are small classes** (`ExploreScreen`, `ProfileScreen`) that keep their own controls, so search text, chips and tabs survive navigation and resizing. Parts that change after a click are replaced inside a slot container, so the scroll position stays.
 
 ---
 
@@ -404,7 +427,8 @@ Low-fidelity sketches at phone and desktop widths will be added to `docs/sketche
 | `src/state.py` | pytest with a fake loader | Uses the injected loader (Section 2) |
 | `src/loaders.py` | pytest with fixture CSVs | Valid file plus one file per validation rule |
 | `src/api.py` | pytest with faked network and `tmp_path` cache | Covers every branch in Section 4.2 |
-| `src/ui/` | Manual checklist (6.5) | Not unit-tested |
+| `ui/messages.py` | pytest | Exact wording and formatting |
+| `ui/` screens | Screenshots at 390 and 1280px in Flet web mode, then the manual checklist (6.5) | Not unit-tested |
 
 **Definition of "enough":** every row in every contract table (Sections 3.2, 3.3, 3.4, and the AppState method table) has at least one test.
 
@@ -475,7 +499,7 @@ select = ["E", "F", "I", "B", "UP"]
 - **Catch specific exceptions;** never use a bare `except:`.
 - **Clean data once, at the boundary** where it enters the program (Section 3.3).
 - **No hardcoded data.** File paths and closed lists live in `src/constants.py`; secrets live only in `.env`.
-- **User-facing text lives only in `src/ui/messages.py`.**
+- **User-facing text lives only in `ui/messages.py`.**
 - **Timestamps** are UTC, ISO 8601, ending in `Z`.
 - **Dependencies point one way** (Section 2).
 
@@ -501,3 +525,5 @@ Architecture decisions are recorded in `docs/adr/`:
 | [0001](adr/0001-data-source-and-caching.md) | Country data source and caching | Proposed |
 | [0002](adr/0002-flet-for-ui.md) | Flet as the UI framework | Accepted |
 | [0003](adr/0003-in-memory-data-no-database.md) | In-memory dictionaries, no database | Accepted |
+| [0004](adr/0004-ui-package-structure.md) | Top-level `ui/` package: shell, one file per screen, pure messages | Accepted |
+| [0005](adr/0005-hifi-theme-seed-and-bundled-fonts.md) | Seed-based Material 3 theme and bundled Noto fonts | Accepted |
