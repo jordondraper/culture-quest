@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from src import loaders
 from src.loaders import load_curated_content
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -154,3 +155,69 @@ def test_file_not_saved_as_utf8(tmp_path):
     )
     with pytest.raises(ValueError, match=r"phrases\.csv: not saved as UTF-8"):
         load(phrases=path)
+
+
+# --- load_app_data() (fetch and CSV loading replaced with fakes) ---
+
+
+def _fake_fetch(records, source="live", error=None):
+    def fetch():
+        fetched_at = None if source == "none" else "2026-10-28T15:00:00Z"
+        return {"records": records, "source": source, "fetched_at": fetched_at, "error": error}
+
+    return fetch
+
+
+@pytest.fixture
+def fake_content(monkeypatch, content):
+    monkeypatch.setattr(loaders, "load_curated_content", lambda: content)
+    return content
+
+
+def test_load_app_data_combines_countries_and_content(monkeypatch, raw_records, fake_content):
+    monkeypatch.setattr(loaders, "fetch_country_data", _fake_fetch(raw_records))
+    data = loaders.load_app_data()
+    assert set(data) == {
+        "countries",
+        "phrases",
+        "culture",
+        "photos",
+        "source",
+        "fetched_at",
+        "fetch_error",
+        "content_error",
+    }
+    assert set(data["countries"]) == {"JP", "ZA", "CH", "AQ"}
+    assert data["phrases"] == fake_content["phrases"]
+    assert data["source"] == "live"
+    assert data["fetched_at"] == "2026-10-28T15:00:00Z"
+    assert data["fetch_error"] is None
+    assert data["content_error"] is None
+
+
+def test_load_app_data_passes_on_cache_source_and_error(monkeypatch, raw_records, fake_content):
+    monkeypatch.setattr(loaders, "fetch_country_data", _fake_fetch(raw_records, "cache", "network"))
+    data = loaders.load_app_data()
+    assert data["source"] == "cache"
+    assert data["fetch_error"] == "network"
+    assert data["countries"]  # cached countries still load
+
+
+def test_load_app_data_without_any_data_has_no_countries(monkeypatch, fake_content):
+    monkeypatch.setattr(loaders, "fetch_country_data", _fake_fetch([], "none", "network"))
+    data = loaders.load_app_data()
+    assert data["countries"] == {}
+    assert data["source"] == "none"
+    assert data["fetched_at"] is None
+
+
+def test_load_app_data_turns_bad_csv_into_partial_mode(monkeypatch, raw_records):
+    def broken():
+        raise ValueError('phrases.csv row 14: unknown category "food"')
+
+    monkeypatch.setattr(loaders, "fetch_country_data", _fake_fetch(raw_records))
+    monkeypatch.setattr(loaders, "load_curated_content", broken)
+    data = loaders.load_app_data()
+    assert data["content_error"] == 'phrases.csv row 14: unknown category "food"'
+    assert data["phrases"] == data["culture"] == data["photos"] == []
+    assert len(data["countries"]) == 4  # country facts still available
